@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --color-ocean-500: #3A7CA5;
+  --color-ocean-700: #1a5e82;
+  --color-ocean-900: #0A2472;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--font-sans); }
+  h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: #1e3a5f;
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    &:hover { background-color: #1e40af; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+    &:disabled { opacity: 0.6; }
+  }
+  .btn-outline {
+    border: 2px solid #1e3a5f;
+    color: #1e3a5f;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    &:hover { background-color: #1e3a5f; color: white; }
+  }
+  .card {
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+    border: 1px solid #f1f5f9;
+    transition: box-shadow 0.2s;
+    &:hover { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+  }
+  .section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 1rem;
+    font-family: 'Poppins', sans-serif;
+  }
+  .section-sub {
+    font-size: 1.125rem;
+    color: #64748b;
+    margin-bottom: 3rem;
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .input {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: #1e293b;
+    transition: all 0.2s;
+    &:focus { outline: none; ring: 2px solid #3b82f6; border-color: transparent; }
+    &::placeholder { color: #94a3b8; }
+  }
+}

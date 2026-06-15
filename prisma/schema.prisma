@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  nom            String
+  prenom         String
+  email          String        @unique
+  passwordHash   String?
+  telephone      String?
+  role           Role          @default(CLIENT)
+  loyaltyPoints  Int           @default(0)
+  totalWashes    Int           @default(0)
+  createdAt      DateTime      @default(now())
+  washes         Wash[]
+  vouchers       Voucher[]
+  reviews        Review[]
+}
+
+model Service {
+  id              Int      @id @default(autoincrement())
+  nom             String
+  description     String
+  prixFcfa        Int
+  durationMinutes Int      @default(30)
+  icon            String   @default("Droplets")
+  active          Boolean  @default(true)
+  washes          Wash[]
+}
+
+model Station {
+  id               Int           @id @default(autoincrement())
+  nom              String
+  adresse          String
+  quartier         String
+  latitude         Float
+  longitude        Float
+  totalPlaces      Int           @default(3)
+  placesLibres     Int           @default(3)
+  heureOuverture   String        @default("06:00")
+  heureFermeture   String        @default("22:00")
+  statut           StationStatut @default(ACTIVE)
+  washes           Wash[]
+}
+
+model Wash {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  serviceId   Int
+  stationId   Int
+  statut      WashStatut @default(PENDING)
+  startTime   DateTime?
+  endTime     DateTime?
+  prixPaye    Int
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id])
+  service     Service    @relation(fields: [serviceId], references: [id])
+  station     Station    @relation(fields: [stationId], references: [id])
+  review      Review?
+}
+
+model Voucher {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  code        String        @unique
+  type        VoucherType
+  valeur      Int           // % de réduction ou 0 si lavage gratuit
+  description String
+  used        Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  expiresAt   DateTime
+  user        User          @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum StationStatut {
+  ACTIVE
+  MAINTENANCE
+  FERMEE
+}
+
+enum WashStatut {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum VoucherType {
+  REDUCTION
+  GRATUIT
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  washId    Int      @unique
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  wash      Wash     @relation(fields: [washId], references: [id])
+}
