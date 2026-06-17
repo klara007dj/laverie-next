@@ -76,6 +76,21 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* À PROPOS DE NOUS */}
+      <section className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold mb-6">
+            ℹ️ À propos de nous
+          </div>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl mb-6">
+            Votre partenaire de confiance pour le lavage de poids lourds
+          </h2>
+          <p className="text-slate-600 text-lg sm:text-xl leading-relaxed max-w-3xl mx-auto">
+            Depuis <strong>2025</strong>, notre laverie met à votre disposition des stations de lavage modernes pour poids lourds, avec un service rapide, fiable et adapté aux besoins des professionnels.
+          </p>
+        </div>
+      </section>
+
       {/* COMMENT ÇA MARCHE */}
       <section className="py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

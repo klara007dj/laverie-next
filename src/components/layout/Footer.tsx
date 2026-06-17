@@ -18,11 +18,10 @@ export default function Footer() {
               <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center border border-slate-700 shadow-sm shrink-0">
                 <img src="/hautePression.jfif" className="w-full h-full object-cover" alt="LaveriePro Logo" />
               </div>
-              LaveriePro
+              Laverie Poids Lourds
             </div>
             <p className="text-sm leading-relaxed text-slate-400">
-              Spécialiste du lavage de poids lourds à Douala depuis 2010.
-              12 stations réparties dans toute la ville.
+              Depuis 2025. Service de lavage rapide, fiable et adapté aux besoins des professionnels.
             </p>
             {/* Réseaux sociaux */}
             <div className="flex gap-3 mt-4">
@@ -64,7 +63,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Phone size={15} className="text-blue-400 shrink-0" />
-                <a href="tel:+237696000000" className="hover:text-blue-400">+237 6 96 00 00 00</a>
+                <a href="tel:+237699861968" className="hover:text-blue-400">+237 6 99 86 19 68</a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={15} className="text-blue-400 shrink-0" />
