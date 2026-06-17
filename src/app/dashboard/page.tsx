@@ -12,6 +12,7 @@ import {
   MessageSquare, ToggleLeft, ToggleRight, Settings, Sparkles, Award, CreditCard, RefreshCw
 } from 'lucide-react'
 import { fcfa, formatDate } from '@/lib/format'
+import { jsPDF } from 'jspdf'
 
 interface DashData {
   user: { nom: string; prenom: string; email: string; loyaltyPoints: number; totalWashes: number; role: string }
@@ -49,6 +50,126 @@ const STATUT_LABEL: Record<string, string> = {
   REJECTED: 'Refusée',
 }
 
+const generatePDFReceipt = (wash: any) => {
+  const doc = new jsPDF()
+
+  // Colors & Styles
+  doc.setFillColor(30, 58, 138) // RGB for #1e3a8a (Navy)
+  doc.rect(0, 0, 210, 40, 'F')
+
+  // Header Title
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.text('LAVERIEPRO DOUALA', 15, 25)
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Reçu de paiement & de prestation', 145, 25)
+
+  // Receipt Details Card
+  doc.setFillColor(248, 250, 252) // slate-50
+  doc.rect(15, 50, 180, 25, 'F')
+
+  const receiptNum = `REC-${new Date(wash.createdAt).toISOString().slice(0, 10).replace(/-/g, '')}-${wash.id}`
+
+  doc.setTextColor(30, 58, 138)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('RÉFÉRENCE DE REÇU :', 20, 60)
+  doc.text('STATUT :', 120, 60)
+
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'normal')
+  doc.text(receiptNum, 20, 68)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(22, 101, 52) // Green
+  doc.text('PAYÉ (WALLET)', 120, 68)
+
+  // Client & Station Columns
+  doc.setTextColor(30, 58, 138)
+  doc.setFontSize(11)
+  doc.text('INFORMATIONS CLIENT', 15, 90)
+  doc.text('STATION DE LAVAGE', 110, 90)
+
+  // Divider
+  doc.setDrawColor(226, 232, 240) // slate-200
+  doc.line(15, 93, 195, 93)
+
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(`Nom : ${wash.user?.prenom || ''} ${wash.user?.nom || ''}`, 15, 100)
+  doc.text(`Email : ${wash.user?.email || 'N/A'}`, 15, 107)
+  doc.text(`Téléphone : ${wash.user?.telephone || 'N/A'}`, 15, 114)
+
+  doc.text(`Nom : ${wash.station?.nom || ''}`, 110, 100)
+  doc.text(`Adresse : ${wash.station?.adresse || ''}`, 110, 107)
+  doc.text(`Quartier : ${wash.station?.quartier || ''}`, 110, 114)
+
+  // Vehicle Details
+  doc.setTextColor(30, 58, 138)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('VÉHICULE CONCERNÉ', 15, 130)
+
+  doc.line(15, 133, 195, 133)
+
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(`Matricule : ${wash.vehicle?.matricule || ''}`, 15, 140)
+  doc.text(`Marque / Modèle : ${wash.vehicle?.marque || ''} ${wash.vehicle?.modele || ''}`, 15, 147)
+  doc.text(`Type : ${wash.vehicle?.type || ''}`, 110, 140)
+  doc.text(`Couleur : ${wash.vehicle?.couleur || 'N/A'}`, 110, 147)
+
+  // Service Details Table Header
+  doc.setFillColor(30, 58, 138)
+  doc.rect(15, 160, 180, 8, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.text('DESCRIPTION DU SERVICE', 20, 166)
+  doc.text('MONTANT', 160, 166)
+
+  // Service Row
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'normal')
+  doc.text(wash.service?.nom || 'Lavage Poids Lourds', 20, 178)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 58, 138)
+  doc.text(`${wash.prixPaye.toLocaleString('fr-FR')} FCFA`, 160, 178)
+
+  doc.setDrawColor(226, 232, 240)
+  doc.line(15, 183, 195, 183)
+
+  // Total
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Total Payé :', 130, 193)
+  doc.setTextColor(22, 101, 52)
+  doc.setFontSize(12)
+  doc.text(`${wash.prixPaye.toLocaleString('fr-FR')} FCFA`, 160, 193)
+
+  // Dates
+  doc.setTextColor(71, 85, 105)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  const scheduledDate = wash.startTime ? new Date(wash.startTime).toLocaleString('fr-FR') : 'N/A'
+  const realEndDate = wash.endTime ? new Date(wash.endTime).toLocaleString('fr-FR') : new Date(wash.createdAt).toLocaleString('fr-FR')
+  doc.text(`Date de réservation planifiée : ${scheduledDate}`, 15, 215)
+  doc.text(`Date de fin de service : ${realEndDate}`, 15, 222)
+  doc.text(`Date d'émission du reçu : ${new Date().toLocaleString('fr-FR')}`, 15, 229)
+
+  // Footer note
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(8)
+  doc.setTextColor(148, 163, 184)
+  doc.text('Merci pour votre confiance. LaveriePro Douala - Service Client +237 6 XX XX XX XX', 15, 260)
+
+  // Save PDF
+  doc.save(`recu-${receiptNum}.pdf`)
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,6 +201,7 @@ export default function DashboardPage() {
   const [bookingTime, setBookingTime] = useState<string>('')
   const [isBooking, setIsBooking] = useState(false)
   const [bookingError, setBookingError] = useState('')
+  const [confirmedEarlyWashes, setConfirmedEarlyWashes] = useState<Record<number, boolean>>({})
 
   // Client Review States
   const [reviewWash, setReviewWash] = useState<any>(null)
@@ -602,6 +724,26 @@ export default function DashboardPage() {
             {/* ── CLIENT: OVERVIEW */}
             {tab === 'overview' && data.loyalty && (
               <div className="space-y-6">
+                {/* Notification: Lavage terminé (READY) */}
+                {washes.filter((w: any) => w.statut === 'READY').map((w: any) => (
+                  <div key={w.id} className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={20} className="animate-bounce" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-purple-950 text-sm">Votre lavage est terminé !</h4>
+                        <p className="text-xs text-purple-800 mt-0.5">Votre véhicule <span className="font-mono font-bold bg-white px-1.5 py-0.2 rounded border">{w.vehicle?.matricule}</span> est prêt à être récupéré à la <strong>{w.station?.nom}</strong>.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => generatePDFReceipt(w)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all shadow-sm shrink-0 self-start sm:self-auto"
+                    >
+                      Télécharger mon reçu
+                    </button>
+                  </div>
+                ))}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { icon: DollarSign,    label: 'Solde Wallet',     value: fcfa(data.wallet?.solde || 0), color: 'bg-blue-600 text-white shadow-md' },
@@ -659,7 +801,7 @@ export default function DashboardPage() {
                             <span>•</span>
                             <span className="font-mono text-[11px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{w.vehicle?.matricule}</span>
                             <span>•</span>
-                            <span>{formatDate(w.createdAt)}</span>
+                            <span>Planifié le : {w.startTime ? formatDate(w.startTime) : 'Non planifié'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -691,7 +833,7 @@ export default function DashboardPage() {
                         <div className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
                           <span className="font-mono bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700">{w.vehicle?.matricule} ({w.vehicle?.marque})</span>
                           <span>•</span>
-                          <span>Créé le : {formatDate(w.createdAt)}</span>
+                          <span>Planifié le : {w.startTime ? formatDate(w.startTime) : 'Non planifié'} (Créé le : {formatDate(w.createdAt)})</span>
                         </div>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
@@ -955,7 +1097,10 @@ export default function DashboardPage() {
                       <tbody>
                         {washes.map((w: any) => (
                           <tr key={w.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                            <td className="py-4 text-slate-500">{formatDate(w.createdAt)}</td>
+                            <td className="py-4 text-slate-500">
+                              <div className="font-semibold text-slate-800 text-xs">{w.startTime ? formatDate(w.startTime) : 'Non planifié'}</div>
+                              <div className="text-[9px] text-slate-400 mt-0.5">Créé le : {formatDate(w.createdAt)}</div>
+                            </td>
                             <td className="py-4 font-bold text-slate-800">{w.service?.nom}</td>
                             <td className="py-4 text-slate-500">{w.station?.nom}</td>
                             <td className="py-4"><span className="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">{w.vehicle?.matricule}</span></td>
@@ -963,6 +1108,14 @@ export default function DashboardPage() {
                             <td className="py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
+                                {(w.statut === 'READY' || w.statut === 'COMPLETED') && (
+                                  <button
+                                    onClick={() => generatePDFReceipt(w)}
+                                    className="text-xs bg-slate-100 hover:bg-blue-50 text-blue-700 font-bold border border-slate-200 px-2 py-1 rounded-lg hover:border-blue-300 transition-all shrink-0"
+                                  >
+                                    Télécharger Reçu
+                                  </button>
+                                )}
                                 {w.statut === 'COMPLETED' && !w.review && (
                                   <button onClick={() => { setReviewWash(w); setReviewError(''); }} className="text-xs text-blue-600 hover:text-white font-bold border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-600 transition-all shrink-0">Laisser un avis</button>
                                 )}
@@ -1023,7 +1176,7 @@ export default function DashboardPage() {
                               <div className="text-xs text-slate-500 mt-0.5">
                                 Client: {w.user?.prenom} {w.user?.nom} | Camion: <span className="font-mono font-bold bg-white px-1.5 py-0.2 rounded border">{w.vehicle?.matricule} ({w.vehicle?.marque})</span>
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-1">Planifié : {formatDate(w.createdAt)}</div>
+                              <div className="text-[10px] text-slate-400 mt-1">Planifié pour le : {w.startTime ? formatDate(w.startTime) : 'Non planifié'}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
@@ -1099,7 +1252,10 @@ export default function DashboardPage() {
                             </td>
                             <td className="py-4 font-semibold text-slate-800">{w.service?.nom}</td>
                             <td className="py-4 text-slate-500">{w.station?.nom}</td>
-                            <td className="py-4 text-slate-500 text-xs">{formatDate(w.createdAt)}</td>
+                             <td className="py-4 text-slate-500">
+                               <div className="font-semibold text-slate-800 text-xs">{w.startTime ? formatDate(w.startTime) : 'Non planifié'}</div>
+                               <div className="text-[9px] text-slate-400 mt-0.5">Créé le : {formatDate(w.createdAt)}</div>
+                             </td>
                             <td className="py-4 text-right font-bold text-slate-800">{fcfa(w.prixPaye)}</td>
                             <td className="py-4 text-center">
                               <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
@@ -1124,15 +1280,38 @@ export default function DashboardPage() {
                                     </button>
                                   </>
                                 )}
-                                {w.statut === 'ACCEPTED' && (
-                                  <button
-                                    disabled={actionLoading}
-                                    onClick={() => handleUpdateWashStatus(w.id, 'VEHICLE_DEPOSITED')}
-                                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
-                                  >
-                                    Déposer Véhicule
-                                  </button>
-                                )}
+                                {w.statut === 'ACCEPTED' && (() => {
+                                  const isFuture = w.startTime ? new Date(w.startTime) > new Date() : false
+                                  const isChecked = !!confirmedEarlyWashes[w.id]
+                                  const isDisabled = isFuture && !isChecked
+                                  return (
+                                    <div className="flex flex-col items-end gap-1">
+                                      {isFuture && (
+                                        <label className="flex items-center gap-1 text-[10px] text-amber-600 font-semibold cursor-pointer select-none">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => setConfirmedEarlyWashes(prev => ({ ...prev, [w.id]: e.target.checked }))}
+                                            className="rounded border-slate-300 text-blue-900 focus:ring-blue-900"
+                                          />
+                                          Camion présent en avance
+                                        </label>
+                                      )}
+                                      <button
+                                        disabled={actionLoading || isDisabled}
+                                        onClick={() => handleUpdateWashStatus(w.id, 'VEHICLE_DEPOSITED')}
+                                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all ${
+                                          isDisabled
+                                            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                        }`}
+                                        title={isDisabled ? "Le créneau n'est pas encore atteint. Confirmez la présence physique." : ""}
+                                      >
+                                        Déposer Véhicule
+                                      </button>
+                                    </div>
+                                  )
+                                })()}
                                 {w.statut === 'VEHICLE_DEPOSITED' && (
                                   <button
                                     disabled={actionLoading}
@@ -1151,6 +1330,14 @@ export default function DashboardPage() {
                                     Lavage terminé
                                   </button>
                                 )}
+                                {(w.statut === 'READY' || w.statut === 'COMPLETED') && (
+                                  <button
+                                    onClick={() => generatePDFReceipt(w)}
+                                    className="text-xs bg-slate-100 hover:bg-blue-50 text-blue-700 font-bold border border-slate-200 px-2 py-1.5 rounded-lg hover:border-blue-300 transition-all shrink-0"
+                                  >
+                                    Télécharger Reçu
+                                  </button>
+                                )}
                                 {w.statut === 'READY' && (
                                   <button
                                     disabled={actionLoading}
@@ -1160,7 +1347,7 @@ export default function DashboardPage() {
                                     Véhicule récupéré (Terminé)
                                   </button>
                                 )}
-                                {['COMPLETED', 'REJECTED', 'CANCELLED'].includes(w.statut) && (
+                                {['COMPLETED', 'REJECTED', 'CANCELLED'].includes(w.statut) && w.statut !== 'COMPLETED' && (
                                   <span className="text-xs text-slate-400 italic">Prestation close</span>
                                 )}
                               </div>

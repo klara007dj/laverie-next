@@ -282,7 +282,7 @@ export async function PUT(req: NextRequest) {
         statut: newStatut,
         stationId: newStationId,
         endTime: newStatut === 'COMPLETED' ? new Date() : undefined,
-        startTime: newStatut === 'WASHING' ? new Date() : undefined
+        startedAt: newStatut === 'WASHING' ? new Date() : undefined
       },
       include: { service: true, station: true, vehicle: true }
     })
