@@ -24,11 +24,20 @@ export async function GET(req: NextRequest) {
       const [user, washes, clients, stations, services, stats, transactions] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.wash.findMany({ include: { service: true, station: true, user: true, vehicle: true }, orderBy: { createdAt: 'desc' } }),
-        prisma.user.findMany({ where: { role: 'CLIENT' }, include: { wallet: true }, orderBy: { createdAt: 'desc' } }),
+        prisma.user.findMany({ where: { role: 'CLIENT' }, orderBy: { createdAt: 'desc' } }),
         prisma.station.findMany({ orderBy: { nom: 'asc' } }),
         prisma.service.findMany({ orderBy: { id: 'asc' } }),
         prisma.wash.aggregate({ _sum: { prixPaye: true }, where: { statut: 'COMPLETED' } }),
-        prisma.walletTransaction.findMany({ include: { user: true }, orderBy: { createdAt: 'desc' } })
+        prisma.walletTransaction.findMany({
+          where: {
+            OR: [
+              { type: 'PAIEMENT' },
+              { type: 'RECHARGE', moyenPaiement: 'REMBOURSEMENT' }
+            ]
+          },
+          include: { user: true },
+          orderBy: { createdAt: 'desc' }
+        })
       ])
 
       if (!user) return NextResponse.json({ message: 'Utilisateur introuvable' }, { status: 404 })

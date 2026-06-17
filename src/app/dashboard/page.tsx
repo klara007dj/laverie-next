@@ -1305,7 +1305,7 @@ export default function DashboardPage() {
             {/* ── ADMIN: CLIENTS */}
             {tab === 'admin_clients' && data.clients && (
               <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
-                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><Users className="text-blue-600" /> Liste des clients et solde de leurs Wallets</h2>
+                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><Users className="text-blue-600" /> Liste des clients</h2>
                 {data.clients.length === 0 ? (
                   <p className="text-slate-400 text-sm italic">Aucun client enregistré.</p>
                 ) : (
@@ -1316,7 +1316,6 @@ export default function DashboardPage() {
                           <th className="pb-3">Nom Complet</th>
                           <th className="pb-3">E-mail</th>
                           <th className="pb-3">Téléphone</th>
-                          <th className="pb-3 text-right">Solde Wallet</th>
                           <th className="pb-3 text-center">Points fidélité</th>
                           <th className="pb-3 text-right">Date d'inscription</th>
                         </tr>
@@ -1327,7 +1326,6 @@ export default function DashboardPage() {
                             <td className="py-4 font-bold text-slate-800">{c.prenom} {c.nom}</td>
                             <td className="py-4 text-slate-600 font-medium">{c.email}</td>
                             <td className="py-4 text-slate-500">{c.telephone || 'Non renseigné'}</td>
-                            <td className="py-4 text-right font-extrabold text-blue-900">{fcfa(c.wallet?.solde || 0)}</td>
                             <td className="py-4 text-center text-yellow-600 font-extrabold flex items-center justify-center gap-1">
                               <Star size={14} className="fill-yellow-400 text-yellow-500" /> {c.loyaltyPoints}
                             </td>
