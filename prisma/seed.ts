@@ -119,23 +119,6 @@ async function main() {
   ]
   const seededVehicles = await Promise.all(vehiclesData.map(v => prisma.vehicle.create({ data: v })))
 
-  // Création des lavages effectués associés
-  const washes = await Promise.all([
-    prisma.wash.create({ data: { userId: clients[0].id, serviceId: 1, stationId: stationAkwa!.id, vehicleId: seededVehicles[0].id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
-    prisma.wash.create({ data: { userId: clients[1].id, serviceId: 2, stationId: stationBonapriso!.id, vehicleId: seededVehicles[2].id, statut: 'COMPLETED', prixPaye: 15000, startTime: new Date(), endTime: new Date() } }),
-    prisma.wash.create({ data: { userId: clients[2].id, serviceId: 1, stationId: stationDeido!.id, vehicleId: seededVehicles[3].id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
-  ])
-  console.log(`✅ ${washes.length} lavages effectués créés`)
-
-  // Témoignages / Avis initiaux
-  const reviewsData = [
-    { userId: clients[0].id, washId: washes[0].id, rating: 5, comment: 'Service impeccable, réservation simple et rapide. Je recommande vivement LaveriePro.' },
-    { userId: clients[1].id, washId: washes[1].id, rating: 5, comment: 'Nous gérons 15 camions via la plateforme. L\'espace admin est très pratique.' },
-    { userId: clients[2].id, washId: washes[2].id, rating: 4, comment: 'Les stations sont modernes et bien équipées. Le personnel est toujours accueillant.' },
-  ]
-  await Promise.all(reviewsData.map(r => prisma.review.create({ data: r })))
-  console.log('✅ Témoignages / Avis initialisés')
-
   console.log('✅ Seed terminé !')
 }
 
