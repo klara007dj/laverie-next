@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,12 +9,12 @@ import {
   Truck, CalendarCheck, Star, Gift, MapPin, History,
   LogOut, Droplets, Loader2, CheckCircle2, Clock, ChevronRight, Trophy,
   Plus, Edit2, Trash2, CheckCircle, XCircle, Shield, DollarSign, Users,
-  MessageSquare, ToggleLeft, ToggleRight, Settings, Sparkles, Award
+  MessageSquare, ToggleLeft, ToggleRight, Settings, Sparkles, Award, CreditCard, RefreshCw
 } from 'lucide-react'
 import { fcfa, formatDate } from '@/lib/format'
 
 interface DashData {
-  user: { nom:string; prenom:string; email:string; loyaltyPoints:number; totalWashes:number; role:string }
+  user: { nom: string; prenom: string; email: string; loyaltyPoints: number; totalWashes: number; role: string }
   washes: any[]
   vouchers?: any[]
   clients?: any[]
@@ -20,39 +23,72 @@ interface DashData {
   totalWashes: number
   totalReservations: number
   totalRevenus?: number
-  loyalty?: { next:number; progress:number; remaining:number }
+  loyalty?: { next: number; progress: number; remaining: number }
+  vehicles?: any[]
+  transactions?: any[]
+  wallet?: { solde: number }
 }
 
-const STATUT_BADGE: Record<string,string> = {
-  COMPLETED:'bg-green-100 text-green-700 border border-green-200',
-  PENDING:'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  IN_PROGRESS:'bg-blue-100 text-blue-700 border border-blue-200',
-  CANCELLED:'bg-red-100 text-red-700 border border-red-200',
+const STATUT_BADGE: Record<string, string> = {
+  PENDING_VALIDATION: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+  ACCEPTED: 'bg-blue-100 text-blue-800 border border-blue-200',
+  VEHICLE_DEPOSITED: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
+  WASHING: 'bg-sky-100 text-sky-800 border border-sky-200',
+  READY: 'bg-purple-100 text-purple-800 border border-purple-200',
+  COMPLETED: 'bg-green-100 text-green-800 border border-green-200',
+  REJECTED: 'bg-red-100 text-red-800 border border-red-200',
 }
-const STATUT_LABEL: Record<string,string> = {
-  COMPLETED:'Terminé', PENDING:'En attente', IN_PROGRESS:'En cours', CANCELLED:'Annulé',
+
+const STATUT_LABEL: Record<string, string> = {
+  PENDING_VALIDATION: 'En attente de validation',
+  ACCEPTED: 'Acceptée',
+  VEHICLE_DEPOSITED: 'Véhicule déposé',
+  WASHING: 'En cours de lavage',
+  READY: 'Prêt à être récupéré',
+  COMPLETED: 'Terminée',
+  REJECTED: 'Refusée',
 }
 
 export default function DashboardPage() {
-  const [data, setData]     = useState<DashData|null>(null)
+  const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab]       = useState<string>('overview')
+  const [tab, setTab] = useState<string>('overview')
   const [stations, setStations] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
-  
-  // Client States
+
+  // Client Vehicle CRUD States
+  const [showAddVehicle, setShowAddVehicle] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState<any>(null)
+  const [vehicleForm, setVehicleForm] = useState({
+    matricule: '', marque: '', modele: '', type: 'Tracteur routier', couleur: '', infos: ''
+  })
+
+  // Client Wallet Recharge States
+  const [showRechargeModal, setShowRechargeModal] = useState(false)
+  const [rechargeForm, setRechargeForm] = useState({
+    montant: '', moyenPaiement: 'ORANGE_MONEY', simulateFail: false
+  })
+  const [isRecharging, setIsRecharging] = useState(false)
+  const [rechargeError, setRechargeError] = useState('')
+  const [rechargeSuccess, setRechargeSuccess] = useState('')
+
+  // Client Booking States
   const [bookingStation, setBookingStation] = useState<any>(null)
   const [selectedServiceId, setSelectedServiceId] = useState<number>(0)
+  const [bookingVehicleId, setBookingVehicleId] = useState<number>(0)
+  const [bookingDate, setBookingDate] = useState<string>('')
+  const [bookingTime, setBookingTime] = useState<string>('')
   const [isBooking, setIsBooking] = useState(false)
   const [bookingError, setBookingError] = useState('')
 
+  // Client Review States
   const [reviewWash, setReviewWash] = useState<any>(null)
   const [reviewRating, setReviewRating] = useState<number>(5)
   const [reviewComment, setReviewComment] = useState('')
   const [isReviewing, setIsReviewing] = useState(false)
   const [reviewError, setReviewError] = useState('')
 
-  // Admin CRUD States
+  // Admin CRUD States (Stations & Services)
   const [editingStation, setEditingStation] = useState<any>(null)
   const [showAddStation, setShowAddStation] = useState(false)
   const [stationForm, setStationForm] = useState({
@@ -77,7 +113,7 @@ export default function DashboardPage() {
     const token = localStorage.getItem('token')
     if (!token) return
     Promise.all([
-      fetch('/api/dashboard', { headers:{ Authorization:`Bearer ${token}` } }).then(r => r.json()),
+      fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch('/api/stations').then(r => r.json()),
       fetch('/api/services').then(r => r.json()),
     ]).then(([dash, stns, svcs]) => {
@@ -90,6 +126,15 @@ export default function DashboardPage() {
       setData(dash)
       setStations(stns)
       setServices(svcs)
+      
+      // Auto-set first service if none selected
+      if (svcs.length > 0 && selectedServiceId === 0) {
+        setSelectedServiceId(svcs[0].id)
+      }
+      // Auto-set first vehicle for booking if available
+      if (dash.vehicles && dash.vehicles.length > 0 && bookingVehicleId === 0) {
+        setBookingVehicleId(dash.vehicles[0].id)
+      }
     }).catch(err => console.error("Error refreshing dashboard:", err))
   }
 
@@ -98,7 +143,7 @@ export default function DashboardPage() {
     if (!token) { router.push('/connexion'); return }
 
     Promise.all([
-      fetch('/api/dashboard', { headers:{ Authorization:`Bearer ${token}` } }).then(r => r.json()),
+      fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch('/api/stations').then(r => r.json()),
       fetch('/api/services').then(r => r.json()),
     ]).then(([dash, stns, svcs]) => {
@@ -112,6 +157,7 @@ export default function DashboardPage() {
       setStations(stns)
       setServices(svcs)
       if (svcs.length > 0) setSelectedServiceId(svcs[0].id)
+      if (dash.vehicles && dash.vehicles.length > 0) setBookingVehicleId(dash.vehicles[0].id)
       
       // Default admin tab
       if (dash.user.role === 'ADMIN') {
@@ -127,6 +173,160 @@ export default function DashboardPage() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     router.push('/')
+  }
+
+  // Client Vehicle CRUD Actions
+  const handleVehicleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setActionLoading(true)
+    setActionError('')
+    const token = localStorage.getItem('token')
+    const method = editingVehicle ? 'PUT' : 'POST'
+    const body = editingVehicle ? { id: editingVehicle.id, ...vehicleForm } : vehicleForm
+
+    try {
+      const res = await fetch('/api/vehicles', {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        setActionError(err.message || 'Erreur lors de l\'enregistrement du véhicule.')
+      } else {
+        setShowAddVehicle(false)
+        setEditingVehicle(null)
+        setVehicleForm({ matricule: '', marque: '', modele: '', type: 'Tracteur routier', couleur: '', infos: '' })
+        refreshData()
+      }
+    } catch {
+      setActionError('Erreur de connexion réseau.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDeleteVehicle = async (id: number) => {
+    if (!confirm('Voulez-vous supprimer ce véhicule ? Ses réservations associées seront également supprimées.')) return
+    setActionLoading(true)
+    const token = localStorage.getItem('token')
+    try {
+      const res = await fetch(`/api/vehicles?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.message || 'Erreur.')
+      } else {
+        refreshData()
+      }
+    } catch {
+      alert('Erreur réseau.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Client Wallet Recharge Action
+  const handleRechargeWallet = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsRecharging(true)
+    setRechargeError('')
+    setRechargeSuccess('')
+    const token = localStorage.getItem('token')
+
+    try {
+      const res = await fetch('/api/wallet/recharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(rechargeForm)
+      })
+      const result = await res.json()
+
+      if (!res.ok) {
+        setRechargeError(result.message || 'La transaction a échoué.')
+      } else {
+        setRechargeSuccess(result.message || 'Recharge réussie !')
+        setRechargeForm({ montant: '', moyenPaiement: 'ORANGE_MONEY', simulateFail: false })
+        setTimeout(() => {
+          setShowRechargeModal(false)
+          setRechargeSuccess('')
+          refreshData()
+        }, 1500)
+      }
+    } catch {
+      setRechargeError('Erreur de connexion avec le service de paiement.')
+    } finally {
+      setIsRecharging(false)
+    }
+  }
+
+  // Client Booking Action
+  const handleBook = async () => {
+    if (!selectedServiceId || !bookingStation || !bookingVehicleId || !bookingDate || !bookingTime) {
+      setBookingError('Veuillez remplir tous les champs obligatoires (véhicule, date et heure).')
+      return
+    }
+    setIsBooking(true)
+    setBookingError('')
+    const token = localStorage.getItem('token')
+    const startDateTime = new Date(`${bookingDate}T${bookingTime}`)
+
+    try {
+      const res = await fetch('/api/washes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          serviceId: selectedServiceId,
+          stationId: bookingStation.id,
+          vehicleId: bookingVehicleId,
+          startTime: startDateTime.toISOString()
+        })
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        setBookingError(result.message || 'Une erreur est survenue.')
+      } else {
+        setBookingStation(null)
+        setBookingVehicleId(data?.vehicles && data.vehicles.length > 0 ? data.vehicles[0].id : 0)
+        setBookingDate('')
+        setBookingTime('')
+        refreshData()
+      }
+    } catch {
+      setBookingError('Erreur de connexion.')
+    } finally {
+      setIsBooking(false)
+    }
+  }
+
+  // Client Review Action
+  const handleReview = async () => {
+    if (!reviewWash || !reviewComment) return
+    setIsReviewing(true)
+    setReviewError('')
+    const token = localStorage.getItem('token')
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ washId: reviewWash.id, rating: reviewRating, comment: reviewComment })
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        setReviewError(result.message || 'Une erreur est survenue.')
+      } else {
+        setReviewWash(null)
+        setReviewComment('')
+        setReviewRating(5)
+        refreshData()
+      }
+    } catch {
+      setReviewError('Erreur de connexion.')
+    } finally {
+      setIsReviewing(false)
+    }
   }
 
   // Admin Actions
@@ -163,7 +363,7 @@ export default function DashboardPage() {
         setSelectedNewStationId(0)
       }
     } else {
-      handleUpdateWashStatus(wash.id, 'IN_PROGRESS')
+      handleUpdateWashStatus(wash.id, 'ACCEPTED')
     }
   }
 
@@ -174,7 +374,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/washes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id: washId, statut: 'IN_PROGRESS', stationId: newStationId })
+        body: JSON.stringify({ id: washId, statut: 'ACCEPTED', stationId: newStationId })
       })
       if (!res.ok) {
         const err = await res.json()
@@ -322,62 +522,9 @@ export default function DashboardPage() {
     }
   }
 
-  // Client Actions
-  const handleBook = async () => {
-    if (!selectedServiceId || !bookingStation) return
-    setIsBooking(true)
-    setBookingError('')
-    const token = localStorage.getItem('token')
-    try {
-      const res = await fetch('/api/washes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ serviceId: selectedServiceId, stationId: bookingStation.id })
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        setBookingError(result.message || 'Une erreur est survenue.')
-      } else {
-        setBookingStation(null)
-        refreshData()
-      }
-    } catch {
-      setBookingError('Erreur de connexion.')
-    } finally {
-      setIsBooking(false)
-    }
-  }
-
-  const handleReview = async () => {
-    if (!reviewWash || !reviewComment) return
-    setIsReviewing(true)
-    setReviewError('')
-    const token = localStorage.getItem('token')
-    try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ washId: reviewWash.id, rating: reviewRating, comment: reviewComment })
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        setReviewError(result.message || 'Une erreur est survenue.')
-      } else {
-        setReviewWash(null)
-        setReviewComment('')
-        setReviewRating(5)
-        refreshData()
-      }
-    } catch {
-      setReviewError('Erreur de connexion.')
-    } finally {
-      setIsReviewing(false)
-    }
-  }
-
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <Loader2 className="animate-spin text-blue-700" size={40}/>
+      <Loader2 className="animate-spin text-blue-700" size={40} />
     </div>
   )
 
@@ -388,27 +535,30 @@ export default function DashboardPage() {
 
   // Admin Navigation Tabs
   const ADMIN_TABS = [
-    { id: 'admin_overview',     label: 'Tableau de bord', icon: Shield },
-    { id: 'admin_reservations', label: 'Réservations',   icon: CalendarCheck },
-    { id: 'admin_stations',     label: 'Stations',       icon: MapPin },
+    { id: 'admin_overview',     label: 'Tableau de bord',   icon: Shield },
+    { id: 'admin_reservations', label: 'Réservations',      icon: CalendarCheck },
+    { id: 'admin_stations',     label: 'Stations',          icon: MapPin },
     { id: 'admin_services',     label: 'Services & Tarifs', icon: Settings },
-    { id: 'admin_clients',      label: 'Clients',        icon: Users },
-    { id: 'admin_reviews',      label: 'Témoignages',    icon: MessageSquare },
+    { id: 'admin_clients',      label: 'Clients & Wallets', icon: Users },
+    { id: 'admin_transactions', label: 'Flux Financiers',   icon: DollarSign },
+    { id: 'admin_reviews',      label: 'Témoignages',       icon: MessageSquare },
   ]
 
   // Client Navigation Tabs
   const CLIENT_TABS = [
-    { id: 'overview',      label: 'Accueil',        icon: Droplets },
-    { id: 'reservations',  label: 'Réservations',   icon: CalendarCheck },
-    { id: 'vehicles',      label: 'Véhicules',      icon: Truck },
-    { id: 'vouchers',      label: 'Mes bons',       icon: Gift },
-    { id: 'stations',      label: 'Stations',       icon: MapPin },
-    { id: 'history',       label: 'Historique',     icon: History },
+    { id: 'overview',     label: 'Accueil',        icon: Droplets },
+    { id: 'reservations', label: 'Réservations',   icon: CalendarCheck },
+    { id: 'vehicles',     label: 'Mes véhicules',  icon: Truck },
+    { id: 'wallet',       label: 'Mon Wallet',     icon: DollarSign },
+    { id: 'vouchers',     label: 'Mes bons',       icon: Gift },
+    { id: 'stations',     label: 'Stations',       icon: MapPin },
+    { id: 'history',      label: 'Historique',     icon: History },
   ]
 
   return (
     <div className="min-h-screen bg-slate-50 pt-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -417,17 +567,17 @@ export default function DashboardPage() {
               {user.role === 'ADMIN' && <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full uppercase font-bold tracking-wider shrink-0 shadow-sm">Admin</span>}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              {user.role === 'ADMIN' ? 'Espace de gestion et d\'administration de LaveriePro.' : 'Prêt pour faire briller votre poids lourd aujourd\'hui ?'}
+              {user.role === 'ADMIN' ? 'Espace de gestion et d\'administration de Laverie Poids Lourds.' : 'Prêt pour faire briller votre poids lourd aujourd\'hui ?'}
             </p>
           </div>
           <div className="flex items-center gap-3">
             {user.role === 'ADMIN' && (
               <Link href="/rapports" className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5 bg-white shadow-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50">
-                <Shield size={14} className="text-blue-500"/> Rapports Généraux
+                <Shield size={14} className="text-blue-500" /> Rapports Généraux
               </Link>
             )}
             <button onClick={logout} className="flex items-center gap-2 text-sm text-slate-400 hover:text-red-500 transition-colors font-medium">
-              <LogOut size={16}/> Déconnexion
+              <LogOut size={16} /> Déconnexion
             </button>
           </div>
         </div>
@@ -441,7 +591,7 @@ export default function DashboardPage() {
                   ? 'border-blue-900 text-blue-900 bg-blue-50/50'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100/70'
               }`}>
-              <Icon size={16}/> {label}
+              <Icon size={16} /> {label}
             </button>
           ))}
         </div>
@@ -454,25 +604,32 @@ export default function DashboardPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { icon: CalendarCheck, label: 'Réservations',    value: data.totalReservations, color: 'bg-blue-50 text-blue-700' },
-                    { icon: Droplets,      label: 'Lavages effectués',value: data.totalWashes,       color: 'bg-green-50 text-green-700' },
-                    { icon: Star,          label: 'Points fidélité',  value: user.loyaltyPoints,      color: 'bg-yellow-50 text-yellow-700' },
-                    { icon: Gift,          label: 'Bons disponibles', value: data.vouchers?.length || 0, color: 'bg-purple-50 text-purple-700' },
+                    { icon: DollarSign,    label: 'Solde Wallet',     value: fcfa(data.wallet?.solde || 0), color: 'bg-blue-600 text-white shadow-md' },
+                    { icon: CalendarCheck, label: 'Réservations',     value: data.totalReservations,        color: 'bg-white text-slate-700 border border-slate-200' },
+                    { icon: Star,          label: 'Points fidélité',   value: user.loyaltyPoints,             color: 'bg-white text-slate-700 border border-slate-200' },
+                    { icon: Gift,          label: 'Bons disponibles',  value: data.vouchers?.length || 0,     color: 'bg-white text-slate-700 border border-slate-200' },
                   ].map(({ icon: Icon, label, value, color }) => (
-                    <div key={label} className="card p-5 flex items-center gap-3 shadow-sm border-slate-100 bg-white">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon size={20}/></div>
-                      <div>
-                        <div className="text-xs text-slate-400 font-medium">{label}</div>
-                        <div className="text-2xl font-extrabold text-slate-900">{value}</div>
+                    <div key={label} className={`card p-5 flex items-center justify-between gap-3 shadow-sm rounded-2xl ${color}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${label === 'Solde Wallet' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}><Icon size={20} /></div>
+                        <div>
+                          <div className={`text-xs font-medium ${label === 'Solde Wallet' ? 'text-blue-100' : 'text-slate-400'}`}>{label}</div>
+                          <div className="text-xl md:text-2xl font-extrabold mt-0.5">{value}</div>
+                        </div>
                       </div>
+                      {label === 'Solde Wallet' && (
+                        <button onClick={() => setTab('wallet')} className="text-xs font-bold bg-white text-blue-700 hover:bg-blue-50 py-1.5 px-3 rounded-lg shadow-sm transition-all">
+                          Gérer
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-2xl p-6 text-slate-800 relative overflow-hidden shadow-lg border border-yellow-200" style={{ background: 'linear-gradient(135deg, #FFD700, #FDB931)' }}>
+                <div className="rounded-2xl p-6 text-slate-800 relative overflow-hidden shadow-lg border border-yellow-200 animate-fadeIn" style={{ background: 'linear-gradient(135deg, #FFD700, #FDB931)' }}>
                   <div className="absolute right-4 bottom-2 text-9xl opacity-10">👑</div>
                   <div className="flex items-center gap-2 mb-2">
-                    <Trophy size={22} className="text-yellow-800"/>
+                    <Trophy size={22} className="text-yellow-800" />
                     <h3 className="font-bold text-lg text-yellow-900">Programme Fidélité</h3>
                   </div>
                   <p className="text-yellow-900 text-sm mb-4">
@@ -481,40 +638,33 @@ export default function DashboardPage() {
                       : 'Félicitations ! Vous avez atteint un palier 🎉'}
                   </p>
                   <div className="bg-white/30 rounded-full h-3 overflow-hidden mb-2">
-                    <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${data.loyalty.progress}%` }}/>
+                    <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${data.loyalty.progress}%` }} />
                   </div>
                   <div className="flex justify-between text-xs text-yellow-900 font-semibold">
                     <span>{user.totalWashes} lavages effectués</span>
                     <span>Prochain palier : {data.loyalty.next}</span>
                   </div>
-                  <div className="flex gap-3 mt-4">
-                    {[{ n: 5, label: '5%' }, { n: 10, label: '10%' }, { n: 20, label: '🎁 Gratuit' }].map(({ n, label }) => (
-                      <div key={n} className={`px-3 py-1 rounded-full text-xs font-bold ${user.totalWashes >= n ? 'bg-yellow-900 text-white shadow' : 'bg-white/30 text-yellow-900'}`}>
-                        {n} lavages → {label}
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
                 <div className="card p-6 shadow-sm border-slate-100 bg-white">
-                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><History size={18} className="text-blue-500"/> Derniers lavages</h3>
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3"><History size={18} className="text-blue-500" /> Vos réservations récentes</h3>
                   {washes.length === 0
-                    ? <p className="text-slate-400 text-sm italic">Aucun lavage pour le moment.</p>
+                    ? <p className="text-slate-400 text-sm italic py-4">Aucun lavage pour le moment.</p>
                     : washes.slice(0, 5).map((w: any) => (
-                      <div key={w.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                      <div key={w.id} className="flex items-center justify-between py-3.5 border-b border-slate-100 last:border-0">
                         <div>
-                          <div className="font-semibold text-slate-800 text-sm">{w.service?.nom}</div>
-                          <div className="text-xs text-slate-400 mt-0.5">{w.station?.nom} · {formatDate(w.createdAt)}</div>
+                          <div className="font-bold text-slate-800 text-sm">{w.service?.nom}</div>
+                          <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                            <span>{w.station?.nom}</span>
+                            <span>•</span>
+                            <span className="font-mono text-[11px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{w.vehicle?.matricule}</span>
+                            <span>•</span>
+                            <span>{formatDate(w.createdAt)}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-semibold text-sm text-slate-800">{fcfa(w.prixPaye)}</span>
+                          <span className="font-extrabold text-sm text-slate-800">{fcfa(w.prixPaye)}</span>
                           <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
-                          {w.statut === 'COMPLETED' && !w.review && (
-                            <button onClick={() => { setReviewWash(w); setReviewError(''); }} className="text-xs text-blue-600 hover:text-white font-bold border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-600 transition-all shrink-0">Laisser un avis</button>
-                          )}
-                          {w.statut === 'COMPLETED' && w.review && (
-                            <span className="text-xs text-slate-400 italic shrink-0">Avis laissé</span>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -526,19 +676,23 @@ export default function DashboardPage() {
             {tab === 'reservations' && (
               <div className="card p-6 shadow-sm border-slate-100 bg-white">
                 <h2 className="font-bold text-slate-900 text-xl mb-6">Mes réservations</h2>
-                {washes.filter((w:any) => w.statut === 'PENDING' || w.statut === 'IN_PROGRESS').length === 0
+                {washes.filter((w: any) => w.statut !== 'COMPLETED' && w.statut !== 'REJECTED').length === 0
                   ? (
                     <div className="text-center py-12">
-                      <CalendarCheck size={48} className="text-slate-200 mx-auto mb-4"/>
+                      <CalendarCheck size={48} className="text-slate-200 mx-auto mb-4" />
                       <p className="text-slate-400 mb-4">Aucune réservation en cours.</p>
-                      <button onClick={() => setTab('stations')} className="btn-primary text-sm py-2 px-5">Réserver une station</button>
+                      <button onClick={() => setTab('stations')} className="btn-primary text-sm py-2.5 px-5">Réserver une station</button>
                     </div>
-                  ) : washes.filter((w:any) => ['PENDING','IN_PROGRESS'].includes(w.statut)).map((w:any) => (
+                  ) : washes.filter((w: any) => !['COMPLETED', 'REJECTED'].includes(w.statut)).map((w: any) => (
                     <div key={w.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 mb-3 hover:bg-slate-100/50 transition-all">
                       <div>
                         <div className="font-bold text-slate-800">{w.service?.nom}</div>
                         <div className="text-sm text-slate-500 mt-0.5">{w.station?.nom} · {w.station?.adresse}</div>
-                        <div className="text-xs text-slate-400 mt-1">{formatDate(w.createdAt)}</div>
+                        <div className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
+                          <span className="font-mono bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700">{w.vehicle?.matricule} ({w.vehicle?.marque})</span>
+                          <span>•</span>
+                          <span>Créé le : {formatDate(w.createdAt)}</span>
+                        </div>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
                     </div>
@@ -548,12 +702,155 @@ export default function DashboardPage() {
 
             {/* ── CLIENT: VEHICLES */}
             {tab === 'vehicles' && (
-              <div className="card p-6 shadow-sm border-slate-100 bg-white">
-                <h2 className="font-bold text-slate-900 text-xl mb-6">Mes véhicules</h2>
-                <div className="text-center py-12">
-                  <Truck size={48} className="text-slate-200 mx-auto mb-4"/>
-                  <p className="text-slate-400 mb-2 font-semibold">Fonctionnalité disponible prochainement.</p>
-                  <p className="text-slate-300 text-sm">Vous pourrez enregistrer vos poids lourds (immatriculation, type, gabarit).</p>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="font-bold text-slate-900 text-xl">Mes véhicules</h2>
+                    <p className="text-slate-500 text-xs mt-0.5">Enregistrez et gérez vos camions pour vos réservations.</p>
+                  </div>
+                  <button onClick={() => { setEditingVehicle(null); setVehicleForm({ matricule: '', marque: '', modele: '', type: 'Tracteur routier', couleur: '', infos: '' }); setShowAddVehicle(true); }} className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] transition-transform">
+                    <Plus size={16} /> Ajouter un véhicule
+                  </button>
+                </div>
+
+                {!data.vehicles || data.vehicles.length === 0 ? (
+                  <div className="card p-12 text-center bg-white shadow-sm rounded-2xl">
+                    <Truck size={48} className="text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 mb-4 font-medium">Aucun véhicule enregistré.</p>
+                    <button onClick={() => setShowAddVehicle(true)} className="btn-primary text-xs py-2 px-4">Ajouter mon premier camion</button>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {data.vehicles.map((v: any) => (
+                      <div key={v.id} className="card p-5 bg-white shadow-sm border border-slate-100 rounded-2xl flex flex-col justify-between hover:border-slate-200 transition-all">
+                        <div>
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <span className="font-mono text-base font-extrabold bg-blue-50 text-blue-700 px-3 py-1 rounded-lg border border-blue-100 inline-block tracking-wider">
+                                {v.matricule}
+                              </span>
+                              <h3 className="font-bold text-slate-900 mt-2">{v.marque} <span className="text-slate-500 text-sm font-semibold">{v.modele || ''}</span></h3>
+                            </div>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase">
+                              {v.type}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 space-y-1.5 mt-4">
+                            {v.couleur && <div><span className="font-medium text-slate-400">Couleur :</span> {v.couleur}</div>}
+                            {v.infos && <div className="italic text-slate-400">"{v.infos}"</div>}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 border-t border-slate-100 pt-4 mt-5">
+                          <button
+                            onClick={() => {
+                              setEditingVehicle(v)
+                              setVehicleForm({
+                                matricule: v.matricule, marque: v.marque, modele: v.modele || '',
+                                type: v.type, couleur: v.couleur || '', infos: v.infos || ''
+                              })
+                              setShowAddVehicle(true)
+                            }}
+                            className="flex-1 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1"
+                          >
+                            <Edit2 size={12} /> Modifier
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVehicle(v.id)}
+                            className="py-1.5 px-3 border border-red-200 hover:bg-red-50 text-red-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── CLIENT: WALLET */}
+            {tab === 'wallet' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row gap-6 items-stretch">
+                  {/* Card Solde */}
+                  <div className="flex-1 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl border border-blue-900 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 flex flex-col justify-between">
+                    <div className="absolute right-4 bottom-2 text-9xl opacity-5"><CreditCard /></div>
+                    <div>
+                      <div className="flex justify-between items-center mb-6">
+                        <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Mon Portefeuille</span>
+                        <span className="text-xs font-semibold bg-blue-600 text-white py-1 px-2.5 rounded-full">Sécurisé</span>
+                      </div>
+                      <div className="text-slate-400 text-xs">Solde disponible</div>
+                      <div className="text-3xl md:text-4xl font-extrabold mt-1 tracking-tight text-white">{fcfa(data.wallet?.solde || 0)}</div>
+                    </div>
+                    <button onClick={() => { setRechargeError(''); setRechargeSuccess(''); setShowRechargeModal(true); }} className="mt-8 w-full bg-white hover:bg-blue-50 text-blue-950 font-bold py-3.5 px-5 rounded-2xl shadow-lg transition-all text-center flex items-center justify-center gap-2">
+                      <Plus size={16} /> Recharger mon Wallet
+                    </button>
+                  </div>
+
+                  {/* Quick Payment Mocks */}
+                  <div className="card p-6 bg-white shadow-sm border border-slate-100 rounded-3xl flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-base mb-2">Méthodes de recharge supportées</h3>
+                      <p className="text-slate-400 text-xs mb-4">Créditez instantanément votre compte pour vos réservations.</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['Orange Money', 'MTN Mobile Money', 'Carte Bancaire Visa', 'Mastercard'].map(p => (
+                          <div key={p} className="p-3 bg-slate-50 border border-slate-200/50 rounded-xl text-center text-xs font-bold text-slate-700">
+                            {p}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-4 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      ℹ️ Le débit de la prestation s'effectue uniquement lorsque l'administrateur **accepte** votre réservation. En cas de refus, aucun frais n'est prélevé.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Historique Transaction */}
+                <div className="card p-6 shadow-sm border-slate-100 bg-white rounded-3xl">
+                  <h3 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <History size={18} className="text-blue-500" /> Historique de rechargements et débits
+                  </h3>
+                  {!data.transactions || data.transactions.length === 0 ? (
+                    <p className="text-slate-400 text-sm italic py-4">Aucune transaction enregistrée.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 font-medium text-left">
+                            <th className="pb-3">Date</th>
+                            <th className="pb-3">Type</th>
+                            <th className="pb-3">Méthode</th>
+                            <th className="pb-3 text-right">Montant</th>
+                            <th className="pb-3 text-right">Statut</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.transactions.map((t: any) => (
+                            <tr key={t.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3.5 text-slate-500 text-xs">{formatDate(t.createdAt)}</td>
+                              <td className="py-3.5">
+                                <span className={`font-semibold text-xs py-0.5 px-2 rounded-full ${t.type === 'RECHARGE' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                  {t.type === 'RECHARGE' ? 'Recharge' : 'Lavage (Débit)'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 font-medium text-slate-600 text-xs">{t.moyenPaiement}</td>
+                              <td className={`py-3.5 text-right font-extrabold ${t.montant > 0 ? 'text-green-600' : 'text-slate-800'}`}>
+                                {t.montant > 0 ? `+${fcfa(t.montant)}` : fcfa(t.montant)}
+                              </td>
+                              <td className="py-3.5 text-right">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${t.statut === 'REUSSIE' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                                  {t.statut === 'REUSSIE' ? 'Réussie' : 'Échouée'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -564,11 +861,11 @@ export default function DashboardPage() {
                 <h2 className="font-bold text-slate-900 text-xl mb-6">Mes bons de réduction</h2>
                 {data.vouchers.length === 0 ? (
                   <div className="text-center py-12">
-                    <Gift size={48} className="text-slate-200 mx-auto mb-4"/>
+                    <Gift size={48} className="text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 mb-2">Aucun bon disponible pour le moment.</p>
                     <p className="text-slate-300 text-sm">Continuez à réserver pour débloquer vos récompenses fidélité !</p>
                   </div>
-                ) : data.vouchers.map((v:any) => (
+                ) : data.vouchers.map((v: any) => (
                   <div key={v.id} className="border-2 border-dashed border-yellow-300 bg-yellow-50/50 rounded-2xl p-5 mb-4 relative overflow-hidden">
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-5xl opacity-10">🎫</div>
                     <div className="flex items-start justify-between">
@@ -593,10 +890,10 @@ export default function DashboardPage() {
               <div>
                 <h2 className="font-bold text-slate-900 text-xl mb-6">Nos stations — Douala</h2>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {stations.map((s:any) => {
+                  {stations.map((s: any) => {
                     const libre = s.statut === 'ACTIVE' && s.placesLibres > 0
                     return (
-                      <div key={s.id} className="card p-5 bg-white shadow-sm border-slate-100 flex flex-col justify-between">
+                      <div key={s.id} className="card p-5 bg-white shadow-sm border border-slate-100 flex flex-col justify-between rounded-2xl">
                         <div>
                           <div className="flex items-start justify-between mb-3">
                             <div>
@@ -607,11 +904,11 @@ export default function DashboardPage() {
                               s.statut === 'ACTIVE' && s.placesLibres > 0 ? 'bg-green-100 text-green-700 border border-green-200' :
                               s.statut === 'MAINTENANCE' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-red-100 text-red-700 border border-red-200'
                             }`}>
-                              {s.statut === 'MAINTENANCE' ? 'Maintenance' : s.placesLibres > 0 ? 'Libre' : 'Complet'}
+                              {s.statut === 'MAINTENANCE' ? 'Maintenance' : s.placesLibres > 0 ? 'Disponible' : 'Occupée'}
                             </span>
                           </div>
                           <div className="text-xs text-slate-500 flex items-center gap-1 mb-4">
-                            <Clock size={12}/> {s.heureOuverture} – {s.heureFermeture}
+                            <Clock size={12} /> {s.heureOuverture} – {s.heureFermeture}
                             &nbsp;·&nbsp; Occupation : {s.totalPlaces - s.placesLibres}/{s.totalPlaces}
                           </div>
                         </div>
@@ -624,7 +921,7 @@ export default function DashboardPage() {
                               : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-200'
                           }`}
                         >
-                          {s.statut === 'MAINTENANCE' ? 'Maintenance' : s.placesLibres > 0 ? 'Réserver' : 'Complet'}
+                          {s.statut === 'MAINTENANCE' ? 'Maintenance' : s.placesLibres > 0 ? 'Réserver' : 'Occupée'}
                         </button>
                       </div>
                     )
@@ -639,7 +936,7 @@ export default function DashboardPage() {
                 <h2 className="font-bold text-slate-900 text-xl mb-6">Historique des prestations</h2>
                 {washes.length === 0 ? (
                   <div className="text-center py-12">
-                    <History size={48} className="text-slate-200 mx-auto mb-4"/>
+                    <History size={48} className="text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-semibold">Aucun historique pour le moment.</p>
                   </div>
                 ) : (
@@ -650,16 +947,18 @@ export default function DashboardPage() {
                           <th className="pb-3">Date</th>
                           <th className="pb-3">Service</th>
                           <th className="pb-3">Station</th>
+                          <th className="pb-3">Véhicule</th>
                           <th className="pb-3 text-right">Prix</th>
                           <th className="pb-3 text-right">Statut</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {washes.map((w:any) => (
+                        {washes.map((w: any) => (
                           <tr key={w.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 text-slate-500">{formatDate(w.createdAt)}</td>
                             <td className="py-4 font-bold text-slate-800">{w.service?.nom}</td>
                             <td className="py-4 text-slate-500">{w.station?.nom}</td>
+                            <td className="py-4"><span className="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">{w.vehicle?.matricule}</span></td>
                             <td className="py-4 text-right font-bold text-slate-800">{fcfa(w.prixPaye)}</td>
                             <td className="py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
@@ -695,10 +994,10 @@ export default function DashboardPage() {
                     { icon: CalendarCheck, label: 'Réservations globales', value: data.totalReservations, color: 'bg-blue-50 text-blue-700 border border-blue-100' },
                     { icon: Droplets,      label: 'Lavages terminés',     value: data.totalWashes,       color: 'bg-green-50 text-green-700 border border-green-100' },
                     { icon: DollarSign,    label: 'Revenus totaux',       value: fcfa(data.totalRevenus || 0), color: 'bg-purple-50 text-purple-700 border border-purple-100' },
-                    { icon: Users,         label: 'Clients',              value: new Set(data.washes.filter((w: any) => w.statut === 'COMPLETED').map((w: any) => w.userId)).size, color: 'bg-yellow-50 text-yellow-700 border border-yellow-100' },
+                    { icon: Users,         label: 'Clients',              value: new Set(data.washes.map((w: any) => w.userId)).size, color: 'bg-yellow-50 text-yellow-700 border border-yellow-100' },
                   ].map(({ icon: Icon, label, value, color }) => (
                     <div key={label} className={`card p-5 flex items-center gap-4 bg-white shadow-sm hover:scale-[1.01] transition-transform`}>
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon size={24}/></div>
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon size={24} /></div>
                       <div>
                         <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{label}</div>
                         <div className="text-2xl font-extrabold text-slate-900 mt-1">{value}</div>
@@ -709,8 +1008,8 @@ export default function DashboardPage() {
 
                 <div className="grid lg:grid-cols-3 gap-6">
                   {/* Quick Bookings Overview */}
-                  <div className="card p-6 bg-white shadow-sm border-slate-100 lg:col-span-2">
-                    <h3 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Clock className="text-blue-600"/> Activité récente</h3>
+                  <div className="card p-6 bg-white shadow-sm border-slate-100 lg:col-span-2 rounded-2xl">
+                    <h3 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Clock className="text-blue-600" /> Activité récente (Demandes de lavage)</h3>
                     {washes.length === 0 ? (
                       <p className="text-slate-400 text-sm italic py-4">Aucune activité enregistrée.</p>
                     ) : (
@@ -718,40 +1017,44 @@ export default function DashboardPage() {
                         {washes.slice(0, 5).map((w: any) => (
                           <div key={w.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 gap-2">
                             <div>
-                              <div className="font-bold text-slate-800 text-sm">{w.service?.nom} · <span className="text-xs text-slate-400 font-medium">{w.station?.nom}</span></div>
-                              <div className="text-xs text-slate-500 mt-0.5">Client: {w.user?.prenom} {w.user?.nom} ({w.user?.email})</div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(w.createdAt)}</div>
+                              <div className="font-bold text-slate-800 text-sm">
+                                {w.service?.nom} · <span className="text-xs text-slate-400 font-medium">{w.station?.nom}</span>
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                Client: {w.user?.prenom} {w.user?.nom} | Camion: <span className="font-mono font-bold bg-white px-1.5 py-0.2 rounded border">{w.vehicle?.matricule} ({w.vehicle?.marque})</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-1">Planifié : {formatDate(w.createdAt)}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
-                              {w.statut === 'PENDING' && (
+                              {w.statut === 'PENDING_VALIDATION' && (
                                 <button
                                   disabled={actionLoading}
                                   onClick={() => handleAcceptClick(w)}
                                   className="text-[11px] bg-blue-900 text-white font-bold px-2.5 py-1 rounded-lg hover:bg-blue-950 transition-all shadow-sm"
                                 >
-                                  Accepter
+                                  Valider
                                 </button>
                               )}
                             </div>
                           </div>
                         ))}
                         <button onClick={() => setTab('admin_reservations')} className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 mt-4">
-                          Voir toutes les réservations <ChevronRight size={14}/>
+                          Voir et piloter les réservations <ChevronRight size={14} />
                         </button>
                       </div>
                     )}
                   </div>
 
                   {/* Quick Stats Summary */}
-                  <div className="card p-6 bg-white shadow-sm border-slate-100">
-                    <h3 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Settings className="text-blue-600"/> Raccourcis</h3>
+                  <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
+                    <h3 className="font-bold text-slate-900 text-lg mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Settings className="text-blue-600" /> Raccourcis de gestion</h3>
                     <div className="space-y-3">
                       <button onClick={() => { setEditingStation(null); setShowAddStation(true); }} className="w-full btn-outline text-sm py-3 px-4 flex items-center justify-center gap-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-900 hover:text-white transition-all font-bold rounded-xl">
-                        <Plus size={16}/> Ajouter une station
+                        <Plus size={16} /> Ajouter une station
                       </button>
                       <button onClick={() => { setEditingService(null); setShowAddService(true); }} className="w-full btn-outline text-sm py-3 px-4 flex items-center justify-center gap-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-900 hover:text-white transition-all font-bold rounded-xl">
-                        <Plus size={16}/> Ajouter un service
+                        <Plus size={16} /> Ajouter un service
                       </button>
                     </div>
                   </div>
@@ -761,11 +1064,11 @@ export default function DashboardPage() {
 
             {/* ── ADMIN: RESERVATIONS */}
             {tab === 'admin_reservations' && (
-              <div className="card p-6 bg-white shadow-sm border-slate-100">
-                <h2 className="font-bold text-slate-900 text-xl mb-6">Gestion des réservations</h2>
+              <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
+                <h2 className="font-bold text-slate-900 text-xl mb-6">Gestion administrative des réservations</h2>
                 {washes.length === 0 ? (
                   <div className="text-center py-12">
-                    <CalendarCheck size={48} className="text-slate-200 mx-auto mb-4"/>
+                    <CalendarCheck size={48} className="text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-semibold">Aucune réservation dans le système.</p>
                   </div>
                 ) : (
@@ -774,9 +1077,10 @@ export default function DashboardPage() {
                       <thead>
                         <tr className="border-b border-slate-100 text-slate-400 font-medium text-left">
                           <th className="pb-3">Client</th>
+                          <th className="pb-3">Véhicule</th>
                           <th className="pb-3">Service</th>
                           <th className="pb-3">Station</th>
-                          <th className="pb-3">Date</th>
+                          <th className="pb-3">Date/Heure</th>
                           <th className="pb-3 text-right">Prix</th>
                           <th className="pb-3 text-center">Statut</th>
                           <th className="pb-3 text-right">Actions</th>
@@ -789,6 +1093,10 @@ export default function DashboardPage() {
                               <div className="font-bold text-slate-800">{w.user?.prenom} {w.user?.nom}</div>
                               <div className="text-xs text-slate-400 mt-0.5">{w.user?.email}</div>
                             </td>
+                            <td className="py-4">
+                              <span className="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">{w.vehicle?.matricule}</span>
+                              <div className="text-[10px] text-slate-400 mt-0.5">{w.vehicle?.marque} ({w.vehicle?.type})</div>
+                            </td>
                             <td className="py-4 font-semibold text-slate-800">{w.service?.nom}</td>
                             <td className="py-4 text-slate-500">{w.station?.nom}</td>
                             <td className="py-4 text-slate-500 text-xs">{formatDate(w.createdAt)}</td>
@@ -798,43 +1106,61 @@ export default function DashboardPage() {
                             </td>
                             <td className="py-4 text-right">
                               <div className="flex justify-end gap-1.5">
-                                {w.statut === 'PENDING' && (
+                                {w.statut === 'PENDING_VALIDATION' && (
                                   <>
                                     <button
                                       disabled={actionLoading}
                                       onClick={() => handleAcceptClick(w)}
-                                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 transition-all"
+                                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
                                     >
                                       Accepter
                                     </button>
                                     <button
                                       disabled={actionLoading}
-                                      onClick={() => handleUpdateWashStatus(w.id, 'CANCELLED')}
-                                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-1 rounded shadow-sm border border-red-200 flex items-center gap-1 transition-all"
+                                      onClick={() => handleUpdateWashStatus(w.id, 'REJECTED')}
+                                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1.5 rounded-lg shadow-sm border border-red-200 transition-all"
                                     >
                                       Refuser
                                     </button>
                                   </>
                                 )}
-                                {w.statut === 'IN_PROGRESS' && (
-                                  <>
-                                    <button
-                                      disabled={actionLoading}
-                                      onClick={() => handleUpdateWashStatus(w.id, 'COMPLETED')}
-                                      className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 transition-all"
-                                    >
-                                      Terminer
-                                    </button>
-                                    <button
-                                      disabled={actionLoading}
-                                      onClick={() => handleUpdateWashStatus(w.id, 'CANCELLED')}
-                                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-1 rounded shadow-sm border border-red-200 flex items-center gap-1 transition-all"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </>
+                                {w.statut === 'ACCEPTED' && (
+                                  <button
+                                    disabled={actionLoading}
+                                    onClick={() => handleUpdateWashStatus(w.id, 'VEHICLE_DEPOSITED')}
+                                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
+                                  >
+                                    Déposer Véhicule
+                                  </button>
                                 )}
-                                {['COMPLETED', 'CANCELLED'].includes(w.statut) && (
+                                {w.statut === 'VEHICLE_DEPOSITED' && (
+                                  <button
+                                    disabled={actionLoading}
+                                    onClick={() => handleUpdateWashStatus(w.id, 'WASHING')}
+                                    className="text-xs bg-sky-600 hover:bg-sky-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
+                                  >
+                                    Lancer le lavage
+                                  </button>
+                                )}
+                                {w.statut === 'WASHING' && (
+                                  <button
+                                    disabled={actionLoading}
+                                    onClick={() => handleUpdateWashStatus(w.id, 'READY')}
+                                    className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
+                                  >
+                                    Lavage terminé
+                                  </button>
+                                )}
+                                {w.statut === 'READY' && (
+                                  <button
+                                    disabled={actionLoading}
+                                    onClick={() => handleUpdateWashStatus(w.id, 'COMPLETED')}
+                                    className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
+                                  >
+                                    Véhicule récupéré (Terminé)
+                                  </button>
+                                )}
+                                {['COMPLETED', 'REJECTED', 'CANCELLED'].includes(w.statut) && (
                                   <span className="text-xs text-slate-400 italic">Prestation close</span>
                                 )}
                               </div>
@@ -861,13 +1187,13 @@ export default function DashboardPage() {
                     });
                     setShowAddStation(true);
                   }} className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] transition-transform">
-                    <Plus size={16}/> Ajouter une station
+                    <Plus size={16} /> Ajouter une station
                   </button>
                 </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {stations.map((s: any) => (
-                    <div key={s.id} className="card p-5 bg-white shadow-sm border-slate-100 flex flex-col justify-between hover:border-slate-200 transition-all">
+                    <div key={s.id} className="card p-5 bg-white shadow-sm border border-slate-100 flex flex-col justify-between hover:border-slate-200 transition-all rounded-2xl">
                       <div>
                         <div className="flex items-start justify-between mb-3">
                           <div>
@@ -882,8 +1208,8 @@ export default function DashboardPage() {
                           </span>
                         </div>
                         <div className="text-xs text-slate-500 space-y-1 mb-4">
-                          <div className="flex items-center gap-1"><Clock size={12} className="text-slate-400"/> Horaires : {s.heureOuverture} – {s.heureFermeture}</div>
-                          <div className="flex items-center gap-1"><Truck size={12} className="text-slate-400"/> Places : {s.totalPlaces - s.placesLibres} occupées sur {s.totalPlaces} ({s.placesLibres} libres)</div>
+                          <div className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> Horaires : {s.heureOuverture} – {s.heureFermeture}</div>
+                          <div className="flex items-center gap-1"><Truck size={12} className="text-slate-400" /> Places : {s.totalPlaces - s.placesLibres} occupées sur {s.totalPlaces} ({s.placesLibres} libres)</div>
                         </div>
                       </div>
                       <div className="flex gap-2 border-t border-slate-100 pt-4 mt-2">
@@ -898,13 +1224,13 @@ export default function DashboardPage() {
                           }}
                           className="flex-1 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1"
                         >
-                          <Edit2 size={12}/> Modifier
+                          <Edit2 size={12} /> Modifier
                         </button>
                         <button
                           onClick={() => handleDeleteStation(s.id)}
                           className="py-1.5 px-3 border border-red-200 hover:bg-red-50 text-red-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center"
                         >
-                          <Trash2 size={12}/>
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
@@ -925,13 +1251,13 @@ export default function DashboardPage() {
                     });
                     setShowAddService(true);
                   }} className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] transition-transform">
-                    <Plus size={16}/> Ajouter un service
+                    <Plus size={16} /> Ajouter un service
                   </button>
                 </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {services.map((s: any) => (
-                    <div key={s.id} className="card p-5 bg-white shadow-sm border-slate-100 flex flex-col justify-between hover:border-slate-200 transition-all">
+                    <div key={s.id} className="card p-5 bg-white shadow-sm border border-slate-100 flex flex-col justify-between hover:border-slate-200 transition-all rounded-2xl">
                       <div>
                         <div className="flex items-start justify-between mb-3">
                           <div>
@@ -946,7 +1272,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="text-xs text-slate-500 space-y-1 mb-4">
                           <div className="font-extrabold text-blue-900 text-base">{fcfa(s.prixFcfa)}</div>
-                          <div className="flex items-center gap-1"><Clock size={12} className="text-slate-400"/> Durée : {s.durationMinutes} min</div>
+                          <div className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> Durée : {s.durationMinutes} min</div>
                           <div className="flex items-center gap-1 text-[11px] text-slate-400">Icône : {s.icon}</div>
                         </div>
                       </div>
@@ -961,13 +1287,13 @@ export default function DashboardPage() {
                           }}
                           className="flex-1 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1"
                         >
-                          <Edit2 size={12}/> Modifier
+                          <Edit2 size={12} /> Modifier
                         </button>
                         <button
                           onClick={() => handleDeleteService(s.id)}
                           className="py-1.5 px-3 border border-red-200 hover:bg-red-50 text-red-600 font-bold rounded-lg text-xs transition-all flex items-center justify-center"
                         >
-                          <Trash2 size={12}/>
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
@@ -978,8 +1304,8 @@ export default function DashboardPage() {
 
             {/* ── ADMIN: CLIENTS */}
             {tab === 'admin_clients' && data.clients && (
-              <div className="card p-6 bg-white shadow-sm border-slate-100">
-                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><Users className="text-blue-600"/> Liste des clients enregistrés</h2>
+              <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
+                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><Users className="text-blue-600" /> Liste des clients et solde de leurs Wallets</h2>
                 {data.clients.length === 0 ? (
                   <p className="text-slate-400 text-sm italic">Aucun client enregistré.</p>
                 ) : (
@@ -990,7 +1316,7 @@ export default function DashboardPage() {
                           <th className="pb-3">Nom Complet</th>
                           <th className="pb-3">E-mail</th>
                           <th className="pb-3">Téléphone</th>
-                          <th className="pb-3 text-center">Lavages effectués</th>
+                          <th className="pb-3 text-right">Solde Wallet</th>
                           <th className="pb-3 text-center">Points fidélité</th>
                           <th className="pb-3 text-right">Date d'inscription</th>
                         </tr>
@@ -1001,9 +1327,9 @@ export default function DashboardPage() {
                             <td className="py-4 font-bold text-slate-800">{c.prenom} {c.nom}</td>
                             <td className="py-4 text-slate-600 font-medium">{c.email}</td>
                             <td className="py-4 text-slate-500">{c.telephone || 'Non renseigné'}</td>
-                            <td className="py-4 text-center font-bold text-slate-800">{c.totalWashes}</td>
+                            <td className="py-4 text-right font-extrabold text-blue-900">{fcfa(c.wallet?.solde || 0)}</td>
                             <td className="py-4 text-center text-yellow-600 font-extrabold flex items-center justify-center gap-1">
-                              <Star size={14} className="fill-yellow-400 text-yellow-500"/> {c.loyaltyPoints}
+                              <Star size={14} className="fill-yellow-400 text-yellow-500" /> {c.loyaltyPoints}
                             </td>
                             <td className="py-4 text-right text-slate-400 text-xs">{formatDate(c.createdAt)}</td>
                           </tr>
@@ -1015,12 +1341,58 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* ── ADMIN: FLUX FINANCIERS */}
+            {tab === 'admin_transactions' && data.transactions && (
+              <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
+                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><DollarSign className="text-blue-600" /> Historique des mouvements financiers des Wallets</h2>
+                {data.transactions.length === 0 ? (
+                  <p className="text-slate-400 text-sm italic">Aucun mouvement financier enregistré.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-slate-400 font-medium text-left">
+                          <th className="pb-3">Date</th>
+                          <th className="pb-3">Client</th>
+                          <th className="pb-3">Type</th>
+                          <th className="pb-3">Méthode</th>
+                          <th className="pb-3 text-right">Montant</th>
+                          <th className="pb-3 text-right">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.transactions.map((t: any) => (
+                          <tr key={t.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 text-slate-500 text-xs">{formatDate(t.createdAt)}</td>
+                            <td className="py-3.5 font-bold text-slate-800">{t.user?.prenom} {t.user?.nom}</td>
+                            <td className="py-3.5">
+                              <span className={`font-semibold text-xs py-0.5 px-2 rounded-full ${t.type === 'RECHARGE' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                {t.type === 'RECHARGE' ? 'Crédit (Recharge)' : 'Débit (Paiement)'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 font-medium text-slate-600 text-xs">{t.moyenPaiement}</td>
+                            <td className={`py-3.5 text-right font-extrabold ${t.montant > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {t.montant > 0 ? `+${fcfa(t.montant)}` : fcfa(t.montant)}
+                            </td>
+                            <td className="py-3.5 text-right">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${t.statut === 'REUSSIE' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                                {t.statut === 'REUSSIE' ? 'Réussie' : 'Échouée'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── ADMIN: REVIEWS (TESTIMONIALS) */}
             {tab === 'admin_reviews' && (
-              <div className="card p-6 bg-white shadow-sm border-slate-100">
-                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><MessageSquare className="text-blue-600"/> Témoignages et avis clients</h2>
-                {/* We load reviews via client fetch but admin has access to reviews data in db */}
-                <AdminReviewsList actionLoading={actionLoading} onDeleteReview={handleDeleteReview}/>
+              <div className="card p-6 bg-white shadow-sm border-slate-100 rounded-2xl">
+                <h2 className="font-bold text-slate-900 text-xl mb-6 flex items-center gap-2"><MessageSquare className="text-blue-600" /> Témoignages et avis clients</h2>
+                <AdminReviewsList actionLoading={actionLoading} onDeleteReview={handleDeleteReview} />
               </div>
             )}
           </>
@@ -1037,6 +1409,7 @@ export default function DashboardPage() {
             <p className="text-slate-500 text-sm mb-6">{bookingStation.adresse}</p>
             
             <div className="space-y-4 mb-6">
+              {/* Select Service */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Choisir un service *</label>
                 <select
@@ -1049,37 +1422,325 @@ export default function DashboardPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Select Vehicle */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sélectionner le véhicule à laver *</label>
+                {!data.vehicles || data.vehicles.length === 0 ? (
+                  <div className="p-3 bg-yellow-50 text-yellow-800 rounded-xl text-xs border border-yellow-200 font-medium">
+                    ⚠️ Aucun véhicule enregistré. Veuillez d'abord ajouter un camion dans l'onglet **"Mes véhicules"** avant de réserver.
+                  </div>
+                ) : (
+                  <select
+                    value={bookingVehicleId}
+                    onChange={(e) => setBookingVehicleId(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  >
+                    {data.vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>{v.matricule} - {v.marque} ({v.type})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Select Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Heure *</label>
+                  <input
+                    type="time"
+                    required
+                    value={bookingTime}
+                    onChange={(e) => setBookingTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+              </div>
               
+              {/* Wallet Check & Summary */}
               {selectedServiceId > 0 && (
-                <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-50/50">
-                  <div className="text-xs text-blue-700 font-bold mb-1">Détails du service sélectionné</div>
-                  <div className="text-sm text-slate-600">{services.find(s => s.id === selectedServiceId)?.description}</div>
-                  <div className="text-xs text-slate-400 mt-2">Durée estimée : {services.find(s => s.id === selectedServiceId)?.durationMinutes} minutes</div>
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/50 space-y-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 font-medium">Prix du service :</span>
+                    <span className="font-bold text-slate-800">{fcfa(services.find(s => s.id === selectedServiceId)?.prixFcfa || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 font-medium">Votre Solde Wallet :</span>
+                    <span className={`font-bold ${data.wallet && data.wallet.solde >= (services.find(s => s.id === selectedServiceId)?.prixFcfa || 0) ? 'text-green-600' : 'text-red-500'}`}>
+                      {fcfa(data.wallet?.solde || 0)}
+                    </span>
+                  </div>
+                  
+                  {data.wallet && data.wallet.solde < (services.find(s => s.id === selectedServiceId)?.prixFcfa || 0) && (
+                    <div className="bg-red-50 text-red-600 text-xs px-3.5 py-2.5 rounded-xl font-medium border border-red-100">
+                      ⚠️ Solde insuffisant. Veuillez recharger votre Wallet avant de poursuivre.
+                    </div>
+                  )}
                 </div>
               )}
               
               {bookingError && (
-                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium">{bookingError}</div>
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{bookingError}</div>
               )}
             </div>
             
             <div className="flex gap-3">
               <button
                 disabled={isBooking}
-                onClick={() => setBookingStation(null)}
+                onClick={() => { setBookingStation(null); setBookingError(''); }}
                 className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-all"
               >
                 Annuler
               </button>
               <button
-                disabled={isBooking}
+                disabled={isBooking || !data.vehicles || data.vehicles.length === 0 || !data.wallet || data.wallet.solde < (services.find(s => s.id === selectedServiceId)?.prixFcfa || 0)}
                 onClick={handleBook}
-                className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow"
               >
-                {isBooking && <Loader2 size={16} className="animate-spin"/>}
+                {isBooking && <Loader2 size={16} className="animate-spin" />}
                 Confirmer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wallet Recharge Modal (Simulated Payment Interface) */}
+      {showRechargeModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-xl border border-slate-100">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Recharger mon Wallet</h3>
+            <p className="text-slate-500 text-xs mb-6">Sélectionnez le montant et la méthode de paiement Mobile Money ou Carte.</p>
+
+            <form onSubmit={handleRechargeWallet} className="space-y-4 mb-6">
+              {/* Payment Methods */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-2">Moyen de paiement *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'ORANGE_MONEY', label: 'Orange Money' },
+                    { id: 'MTN_MOMO',     label: 'MTN MoMo' },
+                    { id: 'VISA',         label: 'Visa' },
+                    { id: 'MASTERCARD',   label: 'Mastercard' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setRechargeForm({ ...rechargeForm, moyenPaiement: m.id })}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all ${
+                        rechargeForm.moyenPaiement === m.id
+                          ? 'border-blue-900 bg-blue-50 text-blue-900 shadow-sm'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount Quick Select */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-2">Prédéfinis (FCFA)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {['5000', '10000', '20000', '50000'].map(a => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setRechargeForm({ ...rechargeForm, montant: a })}
+                      className={`py-1.5 px-2 text-xs font-semibold rounded-lg border text-center transition-all ${
+                        rechargeForm.montant === a
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Amount Input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant Libre (FCFA) *</label>
+                <input
+                  required
+                  type="number"
+                  min="500"
+                  step="500"
+                  value={rechargeForm.montant}
+                  onChange={(e) => setRechargeForm({ ...rechargeForm, montant: e.target.value })}
+                  placeholder="Entrez le montant à déposer"
+                  className="input text-sm"
+                />
+              </div>
+
+              {/* Simulate Failure Switch */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-slate-700">Simuler un échec de paiement</span>
+                  <span className="block text-[10px] text-slate-400">Pour tester le parcours de rejet client</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRechargeForm({ ...rechargeForm, simulateFail: !rechargeForm.simulateFail })}
+                  className="transition-transform active:scale-95"
+                >
+                  {rechargeForm.simulateFail ? (
+                    <ToggleRight className="text-red-500" size={32} />
+                  ) : (
+                    <ToggleLeft className="text-slate-300" size={32} />
+                  )}
+                </button>
+              </div>
+
+              {rechargeError && (
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{rechargeError}</div>
+              )}
+              {rechargeSuccess && (
+                <div className="bg-green-50 text-green-700 text-xs px-4 py-3 rounded-xl font-medium border border-green-100 flex items-center gap-1.5">
+                  <CheckCircle2 size={14} /> {rechargeSuccess}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isRecharging}
+                  onClick={() => setShowRechargeModal(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-all"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRecharging || !rechargeForm.montant}
+                  className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow"
+                >
+                  {isRecharging && <Loader2 size={16} className="animate-spin" />}
+                  Simuler la transaction
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Vehicle Create/Edit Modal */}
+      {showAddVehicle && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">
+              {editingVehicle ? `Modifier le véhicule ${editingVehicle.matricule}` : 'Enregistrer un nouveau véhicule'}
+            </h3>
+            <p className="text-slate-500 text-xs mb-6">Ajoutez les détails de votre camion pour les associer à vos réservations.</p>
+
+            <form onSubmit={handleVehicleSubmit} className="space-y-4 mb-6 text-left">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Numéro d'immatriculation / Matricule *</label>
+                <input
+                  required
+                  value={vehicleForm.matricule}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, matricule: e.target.value })}
+                  placeholder="LT-456-AB"
+                  className="input text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Marque du camion *</label>
+                  <input
+                    required
+                    value={vehicleForm.marque}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, marque: e.target.value })}
+                    placeholder="Mercedes, Volvo, Scania"
+                    className="input text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Modèle (Optionnel)</label>
+                  <input
+                    value={vehicleForm.modele}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, modele: e.target.value })}
+                    placeholder="Actros, FH16"
+                    className="input text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Type de véhicule *</label>
+                <select
+                  value={vehicleForm.type}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, type: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option>Tracteur routier</option>
+                  <option>Semi-remorque</option>
+                  <option>Camion Benne</option>
+                  <option>Citerne</option>
+                  <option>Plateau</option>
+                  <option>Autre</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Couleur (Optionnel)</label>
+                  <input
+                    value={vehicleForm.couleur}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, couleur: e.target.value })}
+                    placeholder="Bleu, Blanc"
+                    className="input text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Informations complémentaires</label>
+                <textarea
+                  rows={2}
+                  value={vehicleForm.infos}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, infos: e.target.value })}
+                  placeholder="Gabarit spécial, remarques pour le lavage..."
+                  className="input text-sm resize-none"
+                />
+              </div>
+
+              {actionError && (
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{actionError}</div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => setShowAddVehicle(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-all"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow"
+                >
+                  {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                  Enregistrer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1095,7 +1756,7 @@ export default function DashboardPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Note (Étoiles)</label>
                 <div className="flex gap-2">
-                  {[1,2,3,4,5].map((star) => (
+                  {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       onClick={() => setReviewRating(star)}
@@ -1126,7 +1787,7 @@ export default function DashboardPage() {
               </div>
               
               {reviewError && (
-                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium">{reviewError}</div>
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{reviewError}</div>
               )}
             </div>
             
@@ -1141,9 +1802,9 @@ export default function DashboardPage() {
               <button
                 disabled={isReviewing || !reviewComment.trim()}
                 onClick={handleReview}
-                className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow"
               >
-                {isReviewing && <Loader2 size={16} className="animate-spin"/>}
+                {isReviewing && <Loader2 size={16} className="animate-spin" />}
                 Envoyer
               </button>
             </div>
@@ -1280,7 +1941,7 @@ export default function DashboardPage() {
               </div>
 
               {actionError && (
-                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium">{actionError}</div>
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{actionError}</div>
               )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">
@@ -1297,7 +1958,7 @@ export default function DashboardPage() {
                   disabled={actionLoading}
                   className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow"
                 >
-                  {actionLoading && <Loader2 size={16} className="animate-spin"/>}
+                  {actionLoading && <Loader2 size={16} className="animate-spin" />}
                   {editingStation ? 'Mettre à jour' : 'Créer la station'}
                 </button>
               </div>
@@ -1386,14 +2047,14 @@ export default function DashboardPage() {
                     onClick={() => setServiceForm({ ...serviceForm, active: !serviceForm.active })}
                     className="text-slate-600 hover:text-slate-800 transition-colors"
                   >
-                    {serviceForm.active ? <ToggleRight className="text-green-600" size={36}/> : <ToggleLeft className="text-slate-300" size={36}/>}
+                    {serviceForm.active ? <ToggleRight className="text-green-600" size={36} /> : <ToggleLeft className="text-slate-300" size={36} />}
                   </button>
                   <span className="text-xs font-semibold text-slate-600">Service actif</span>
                 </div>
               </div>
 
               {actionError && (
-                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium">{actionError}</div>
+                <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl font-medium border border-red-100">{actionError}</div>
               )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">
@@ -1410,7 +2071,7 @@ export default function DashboardPage() {
                   disabled={actionLoading}
                   className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow"
                 >
-                  {actionLoading && <Loader2 size={16} className="animate-spin"/>}
+                  {actionLoading && <Loader2 size={16} className="animate-spin" />}
                   {editingService ? 'Mettre à jour' : 'Créer le service'}
                 </button>
               </div>
@@ -1469,9 +2130,9 @@ export default function DashboardPage() {
                 <button
                   disabled={actionLoading || selectedNewStationId === 0}
                   onClick={() => handleReassignAndAccept(reassignWash.id, selectedNewStationId)}
-                  className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow"
                 >
-                  {actionLoading && <Loader2 size={16} className="animate-spin"/>}
+                  {actionLoading && <Loader2 size={16} className="animate-spin" />}
                   Réaffecter et Valider
                 </button>
               </div>
@@ -1479,7 +2140,7 @@ export default function DashboardPage() {
                 disabled={actionLoading}
                 onClick={async () => {
                   if (confirm('Voulez-vous refuser cette réservation ?')) {
-                    await handleUpdateWashStatus(reassignWash.id, 'CANCELLED')
+                    await handleUpdateWashStatus(reassignWash.id, 'REJECTED')
                     setReassignWash(null)
                     setSelectedNewStationId(0)
                   }
@@ -1509,7 +2170,7 @@ function AdminReviewsList({ actionLoading, onDeleteReview }: { actionLoading: bo
       .finally(() => setLoading(false))
   }, [actionLoading]) // Reload reviews when an action finishes
 
-  if (loading) return <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" size={28}/></div>
+  if (loading) return <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" size={28} /></div>
 
   if (reviews.length === 0) return <p className="text-slate-400 text-sm italic py-4">Aucun avis laissé par les clients.</p>
 
@@ -1525,7 +2186,7 @@ function AdminReviewsList({ actionLoading, onDeleteReview }: { actionLoading: bo
               </div>
               <div className="flex gap-0.5 shrink-0">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={12} className={`text-yellow-400 ${i < r.rating ? 'fill-yellow-400' : 'text-slate-200'}`}/>
+                  <Star key={i} size={12} className={`text-yellow-400 ${i < r.rating ? 'fill-yellow-400' : 'text-slate-200'}`} />
                 ))}
               </div>
             </div>
@@ -1538,7 +2199,7 @@ function AdminReviewsList({ actionLoading, onDeleteReview }: { actionLoading: bo
               onClick={() => onDeleteReview(r.id)}
               className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 transition-colors"
             >
-              <Trash2 size={13}/> Supprimer
+              <Trash2 size={13} /> Supprimer
             </button>
           </div>
         </div>

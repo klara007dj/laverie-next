@@ -20,6 +20,54 @@ model User {
   washes         Wash[]
   vouchers       Voucher[]
   reviews        Review[]
+  wallet         Wallet?
+  vehicles       Vehicle[]
+  transactions   WalletTransaction[]
+}
+
+model Wallet {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  solde     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  matricule String
+  marque    String
+  modele    String?
+  type      String
+  couleur   String?
+  infos     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  washes    Wash[]
+}
+
+model WalletTransaction {
+  id            Int               @id @default(autoincrement())
+  userId        Int
+  montant       Int
+  type          TransactionType
+  moyenPaiement String
+  statut        TransactionStatut
+  createdAt     DateTime          @default(now())
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum TransactionType {
+  RECHARGE
+  PAIEMENT
+}
+
+enum TransactionStatut {
+  REUSSIE
+  ECHOUEE
 }
 
 model Service {
@@ -53,7 +101,8 @@ model Wash {
   userId      Int
   serviceId   Int
   stationId   Int
-  statut      WashStatut @default(PENDING)
+  vehicleId   Int
+  statut      WashStatut @default(PENDING_VALIDATION)
   startTime   DateTime?
   endTime     DateTime?
   prixPaye    Int
@@ -61,6 +110,7 @@ model Wash {
   user        User       @relation(fields: [userId], references: [id])
   service     Service    @relation(fields: [serviceId], references: [id])
   station     Station    @relation(fields: [stationId], references: [id])
+  vehicle     Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   review      Review?
 }
 
@@ -89,10 +139,13 @@ enum StationStatut {
 }
 
 enum WashStatut {
-  PENDING
-  IN_PROGRESS
+  PENDING_VALIDATION
+  ACCEPTED
+  VEHICLE_DEPOSITED
+  WASHING
+  READY
   COMPLETED
-  CANCELLED
+  REJECTED
 }
 
 enum VoucherType {

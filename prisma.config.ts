@@ -9,6 +9,6 @@ export default defineConfig({
     url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/placeholder',
   },
   migrations: {
-    seed: 'ts-node --compiler-options {"module":"CommonJS"} prisma/seed.ts',
+    seed: 'npx ts-node --compiler-options {"module":"CommonJS"} prisma/seed.ts',
   },
 });

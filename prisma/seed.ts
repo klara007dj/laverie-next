@@ -34,6 +34,13 @@ async function main() {
   await prisma.review.deleteMany()
   await prisma.wash.deleteMany()
   await prisma.voucher.deleteMany()
+  try {
+    await prisma.walletTransaction.deleteMany()
+    await prisma.wallet.deleteMany()
+    await prisma.vehicle.deleteMany()
+  } catch (err) {
+    console.log('Relations tables not yet fully created, ignoring drop errors')
+  }
   await prisma.user.deleteMany()
   await prisma.station.deleteMany()
   await prisma.service.deleteMany()
@@ -92,11 +99,31 @@ async function main() {
   const clients = await Promise.all(clientData.map(c => prisma.user.create({ data: c })))
   console.log(`✅ ${clients.length} clients démo créés`)
 
+  // Wallets et Véhicules
+  console.log('🌱 Initialisation des Wallets et Véhicules pour les clients démo...')
+  const walletData = [
+    { userId: clients[0].id, solde: 50000 },
+    { userId: clients[1].id, solde: 25000 },
+    { userId: clients[2].id, solde: 12000 },
+  ]
+  await Promise.all(walletData.map(w => prisma.wallet.create({ data: w })))
+
+  const vehiclesData = [
+    // Martin
+    { userId: clients[0].id, matricule: 'LT-456-AB', marque: 'Mercedes', modele: 'Actros', type: 'Tracteur routier', couleur: 'Bleu', infos: 'Camion principal' },
+    { userId: clients[0].id, matricule: 'LT-123-CD', marque: 'Volvo',    modele: 'FH16',   type: 'Semi-remorque',    couleur: 'Blanc' },
+    // Sophie
+    { userId: clients[1].id, matricule: 'CE-782-CD', marque: 'Scania',   modele: 'R500',   type: 'Camion Benne',     couleur: 'Rouge' },
+    // Ahmed
+    { userId: clients[2].id, matricule: 'OU-991-EF', marque: 'MAN',      modele: 'TGX',    type: 'Citerne',          couleur: 'Gris' },
+  ]
+  const seededVehicles = await Promise.all(vehiclesData.map(v => prisma.vehicle.create({ data: v })))
+
   // Création des lavages effectués associés
   const washes = await Promise.all([
-    prisma.wash.create({ data: { userId: clients[0].id, serviceId: 1, stationId: stationAkwa!.id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
-    prisma.wash.create({ data: { userId: clients[1].id, serviceId: 2, stationId: stationBonapriso!.id, statut: 'COMPLETED', prixPaye: 15000, startTime: new Date(), endTime: new Date() } }),
-    prisma.wash.create({ data: { userId: clients[2].id, serviceId: 1, stationId: stationDeido!.id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
+    prisma.wash.create({ data: { userId: clients[0].id, serviceId: 1, stationId: stationAkwa!.id, vehicleId: seededVehicles[0].id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
+    prisma.wash.create({ data: { userId: clients[1].id, serviceId: 2, stationId: stationBonapriso!.id, vehicleId: seededVehicles[2].id, statut: 'COMPLETED', prixPaye: 15000, startTime: new Date(), endTime: new Date() } }),
+    prisma.wash.create({ data: { userId: clients[2].id, serviceId: 1, stationId: stationDeido!.id, vehicleId: seededVehicles[3].id, statut: 'COMPLETED', prixPaye: 8000, startTime: new Date(), endTime: new Date() } }),
   ])
   console.log(`✅ ${washes.length} lavages effectués créés`)
 
