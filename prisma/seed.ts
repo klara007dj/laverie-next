@@ -90,35 +90,6 @@ async function main() {
   })
   console.log('✅ Compte admin créé (admin@gmail.com / Admin2025!)')
 
-  // Clients démo pour les témoignages
-  const clientData = [
-    { nom: 'Djeumen', prenom: 'Martin', email: 'martin.d@gmail.com', passwordHash: await bcrypt.hash('Client2025!', 12), role: 'CLIENT' as const, totalWashes: 1, loyaltyPoints: 1 },
-    { nom: 'Laure',   prenom: 'Sophie', email: 'sophie.l@gmail.com', passwordHash: await bcrypt.hash('Client2025!', 12), role: 'CLIENT' as const, totalWashes: 1, loyaltyPoints: 1 },
-    { nom: 'Kamdem',  prenom: 'Ahmed',  email: 'ahmed.k@gmail.com',  passwordHash: await bcrypt.hash('Client2025!', 12), role: 'CLIENT' as const, totalWashes: 1, loyaltyPoints: 1 },
-  ]
-  const clients = await Promise.all(clientData.map(c => prisma.user.create({ data: c })))
-  console.log(`✅ ${clients.length} clients démo créés`)
-
-  // Wallets et Véhicules
-  console.log('🌱 Initialisation des Wallets et Véhicules pour les clients démo...')
-  const walletData = [
-    { userId: clients[0].id, solde: 50000 },
-    { userId: clients[1].id, solde: 25000 },
-    { userId: clients[2].id, solde: 12000 },
-  ]
-  await Promise.all(walletData.map(w => prisma.wallet.create({ data: w })))
-
-  const vehiclesData = [
-    // Martin
-    { userId: clients[0].id, matricule: 'LT-456-AB', marque: 'Mercedes', modele: 'Actros', type: 'Tracteur routier', couleur: 'Bleu', infos: 'Camion principal' },
-    { userId: clients[0].id, matricule: 'LT-123-CD', marque: 'Volvo',    modele: 'FH16',   type: 'Semi-remorque',    couleur: 'Blanc' },
-    // Sophie
-    { userId: clients[1].id, matricule: 'CE-782-CD', marque: 'Scania',   modele: 'R500',   type: 'Camion Benne',     couleur: 'Rouge' },
-    // Ahmed
-    { userId: clients[2].id, matricule: 'OU-991-EF', marque: 'MAN',      modele: 'TGX',    type: 'Citerne',          couleur: 'Gris' },
-  ]
-  const seededVehicles = await Promise.all(vehiclesData.map(v => prisma.vehicle.create({ data: v })))
-
   console.log('✅ Seed terminé !')
 }
 

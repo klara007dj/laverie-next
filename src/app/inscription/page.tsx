@@ -26,6 +26,12 @@ export default function InscriptionPage() {
     e.preventDefault(); setError('')
     if (form.password !== form.confirm) return setError('Les mots de passe ne correspondent pas.')
     if (form.password.length < 6) return setError('Mot de passe : 6 caractères minimum.')
+    
+    const phoneRegex = /^\+237\s*6\s*([0-9]\s*){8}$/
+    if (!phoneRegex.test(form.telephone.trim())) {
+      return setError('Le numéro de téléphone doit être au format +237 6 xx xx xx xx.')
+    }
+
     setLoading(true)
     try {
       const res  = await fetch('/api/auth/inscription', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) })
@@ -71,8 +77,8 @@ export default function InscriptionPage() {
                 <input name="email" type="email" value={form.email} onChange={handle} required placeholder="jean@transport.cm" className="input"/>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Téléphone</label>
-                <input name="telephone" value={form.telephone} onChange={handle} placeholder="+237 6 XX XX XX XX" className="input"/>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Téléphone *</label>
+                <input name="telephone" value={form.telephone} onChange={handle} required placeholder="+237 6 XX XX XX XX" className="input"/>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Mot de passe *</label>

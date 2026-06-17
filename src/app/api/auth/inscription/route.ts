@@ -10,6 +10,16 @@ export async function POST(req: NextRequest) {
     if (!nom || !prenom || !email || !password)
       return NextResponse.json({ message: 'Champs requis manquants' }, { status: 400 })
 
+    const trimmedPhone = (telephone || '').trim()
+    if (!trimmedPhone) {
+      return NextResponse.json({ message: 'Le numéro de téléphone est requis.' }, { status: 400 })
+    }
+
+    const phoneRegex = /^\+237\s*6\s*([0-9]\s*){8}$/
+    if (!phoneRegex.test(trimmedPhone)) {
+      return NextResponse.json({ message: 'Le numéro de téléphone doit être au format +237 6 xx xx xx xx.' }, { status: 400 })
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing)
       return NextResponse.json({ message: 'Cet e-mail est déjà utilisé' }, { status: 409 })
@@ -21,7 +31,7 @@ export async function POST(req: NextRequest) {
         prenom,
         email,
         passwordHash,
-        telephone: telephone || null,
+        telephone: trimmedPhone,
         wallet: {
           create: {
             solde: 0
