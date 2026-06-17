@@ -655,7 +655,7 @@ export default function DashboardPage() {
                     { icon: CalendarCheck, label: 'Réservations globales', value: data.totalReservations, color: 'bg-blue-50 text-blue-700 border border-blue-100' },
                     { icon: Droplets,      label: 'Lavages terminés',     value: data.totalWashes,       color: 'bg-green-50 text-green-700 border border-green-100' },
                     { icon: DollarSign,    label: 'Revenus totaux',       value: fcfa(data.totalRevenus || 0), color: 'bg-purple-50 text-purple-700 border border-purple-100' },
-                    { icon: MapPin,        label: 'Stations gérées',      value: stations.length,        color: 'bg-yellow-50 text-yellow-700 border border-yellow-100' },
+                    { icon: Users,         label: 'Clients',              value: new Set(data.washes.filter((w: any) => w.statut === 'COMPLETED').map((w: any) => w.userId)).size, color: 'bg-yellow-50 text-yellow-700 border border-yellow-100' },
                   ].map(({ icon: Icon, label, value, color }) => (
                     <div key={label} className={`card p-5 flex items-center gap-4 bg-white shadow-sm hover:scale-[1.01] transition-transform`}>
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon size={24}/></div>

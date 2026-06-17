@@ -15,7 +15,31 @@ export async function GET(req: NextRequest) {
       prisma.station.count({ where: { statut: 'ACTIVE' } }),
     ])
     const agg = await prisma.wash.aggregate({ _sum: { prixPaye: true }, where: { statut: 'COMPLETED' } })
-    return NextResponse.json({ totalReservations, totalLavages, stationsActives, totalRevenus: agg._sum.prixPaye || 0, servicePlusPopulaire: 'Lavage Complet' })
+
+    const grouped = await prisma.wash.groupBy({
+      by: ['serviceId'],
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 1,
+    })
+    
+    let servicePlusPopulaire = 'Aucun'
+    if (grouped.length > 0) {
+      const popular = await prisma.service.findUnique({
+        where: { id: grouped[0].serviceId }
+      })
+      if (popular) {
+        servicePlusPopulaire = popular.nom
+      }
+    }
+
+    return NextResponse.json({
+      totalReservations,
+      totalLavages,
+      stationsActives,
+      totalRevenus: agg._sum.prixPaye || 0,
+      servicePlusPopulaire,
+    })
   } catch {
     return NextResponse.json({ totalReservations: 1029, totalLavages: 1847, stationsActives: 12, totalRevenus: 23580000, servicePlusPopulaire: 'Lavage Complet' })
   }
