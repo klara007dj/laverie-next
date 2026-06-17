@@ -20,7 +20,7 @@ export async function GET() {
       },
     })
 
-    const formatted = reviews.map((r) => {
+    const formatted = reviews.map((r: any) => {
       const email = r.user.email
       const poste = POSTES[email] || 'Client LaveriePro'
       const nomComplet = `${r.user.prenom} ${r.user.nom.charAt(0)}.`
