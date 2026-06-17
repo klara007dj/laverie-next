@@ -20,8 +20,6 @@ export default function Navbar() {
   const pathname = usePathname()
   const router   = useRouter()
 
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/rapports')) return null
-
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', onScroll)
@@ -43,6 +41,8 @@ export default function Navbar() {
   }
 
   const isDashboard = pathname.startsWith('/dashboard')
+
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/rapports')) return null
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
