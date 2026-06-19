@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     // Client Dashboard payload
     const [user, washes, vouchers, vehicles, transactions, dbWallet] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId } }),
-      prisma.wash.findMany({ where: { userId }, include: { service: true, station: true, review: true, vehicle: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.wash.findMany({ where: { userId }, include: { service: true, station: true, review: true, vehicle: true, user: true }, orderBy: { createdAt: 'desc' } }),
       prisma.voucher.findMany({ where: { userId, used: false, expiresAt: { gte: new Date() } } }),
       prisma.vehicle.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.walletTransaction.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),

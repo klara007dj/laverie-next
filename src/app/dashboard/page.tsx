@@ -50,7 +50,7 @@ const STATUT_LABEL: Record<string, string> = {
   REJECTED: 'Refusée',
 }
 
-const generatePDFReceipt = (wash: any) => {
+const generatePDFReceipt = (wash: any, fallbackUser?: any) => {
   const doc = new jsPDF()
 
   // Colors & Styles
@@ -96,12 +96,13 @@ const generatePDFReceipt = (wash: any) => {
   doc.setDrawColor(226, 232, 240) // slate-200
   doc.line(15, 93, 195, 93)
 
+  const clientUser = wash.user || fallbackUser
   doc.setTextColor(71, 85, 105)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
-  doc.text(`Nom : ${wash.user?.prenom || ''} ${wash.user?.nom || ''}`, 15, 100)
-  doc.text(`Email : ${wash.user?.email || 'N/A'}`, 15, 107)
-  doc.text(`Téléphone : ${wash.user?.telephone || 'N/A'}`, 15, 114)
+  doc.text(`Nom : ${clientUser?.prenom || ''} ${clientUser?.nom || ''}`.trim() || 'Nom : Client', 15, 100)
+  doc.text(`Email : ${clientUser?.email || 'N/A'}`, 15, 107)
+  doc.text(`Téléphone : ${clientUser?.telephone || 'N/A'}`, 15, 114)
 
   doc.text(`Nom : ${wash.station?.nom || ''}`, 110, 100)
   doc.text(`Adresse : ${wash.station?.adresse || ''}`, 110, 107)
@@ -737,7 +738,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => generatePDFReceipt(w)}
+                      onClick={() => generatePDFReceipt(w, data.user)}
                       className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all shadow-sm shrink-0 self-start sm:self-auto"
                     >
                       Télécharger mon reçu
@@ -1114,7 +1115,7 @@ export default function DashboardPage() {
                           <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2.5 border-t border-slate-100">
                             {(w.statut === 'READY' || w.statut === 'COMPLETED') && (
                               <button
-                                onClick={() => generatePDFReceipt(w)}
+                                onClick={() => generatePDFReceipt(w, data?.user)}
                                 className="text-xs bg-slate-100 hover:bg-blue-50 text-blue-700 font-bold border border-slate-200 px-2 py-1.5 rounded-lg hover:border-blue-300 transition-all shrink-0"
                               >
                                 Reçu PDF
@@ -1160,7 +1161,7 @@ export default function DashboardPage() {
                                   <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${STATUT_BADGE[w.statut]}`}>{STATUT_LABEL[w.statut]}</span>
                                   {(w.statut === 'READY' || w.statut === 'COMPLETED') && (
                                     <button
-                                      onClick={() => generatePDFReceipt(w)}
+                                      onClick={() => generatePDFReceipt(w, data?.user)}
                                       className="text-xs bg-slate-100 hover:bg-blue-50 text-blue-700 font-bold border border-slate-200 px-2 py-1 rounded-lg hover:border-blue-300 transition-all shrink-0"
                                     >
                                       Télécharger Reçu

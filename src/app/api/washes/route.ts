@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     } else {
       washes = await prisma.wash.findMany({
         where: { userId },
-        include: { service: true, station: true, vehicle: true },
+        include: { service: true, station: true, vehicle: true, user: true },
         orderBy: { createdAt: 'desc' }
       })
     }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         statut: 'PENDING_VALIDATION',
         startTime: startTime ? new Date(startTime) : null
       },
-      include: { service: true, station: true, vehicle: true }
+      include: { service: true, station: true, vehicle: true, user: true }
     })
 
     return NextResponse.json({ wash })
@@ -284,7 +284,7 @@ export async function PUT(req: NextRequest) {
         endTime: newStatut === 'COMPLETED' ? new Date() : undefined,
         startedAt: newStatut === 'WASHING' ? new Date() : undefined
       },
-      include: { service: true, station: true, vehicle: true }
+      include: { service: true, station: true, vehicle: true, user: true }
     })
 
     return NextResponse.json(updatedWash)
